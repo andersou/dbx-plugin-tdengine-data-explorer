@@ -1,0 +1,76 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { MAX_ROWS, RANGES, autoWindow, buildQuery, durationMs, filterClause, quoteIdent, quoteString, tagValuesQuery } from "../src/lib/sql.js";
+
+const meta = { tsColumn: "ts", tagTypes: { location: "VARCHAR(24)", groupid: "INT" } };
+const query = {
+  database: "power",
+  table: "meters",
+  fields: ["current"],
+  fns: ["avg"],
+  filters: [],
+  groupBy: "tbname",
+  fill: "null",
+  window: "1m",
+  maxSeries: 20,
+  range: { type: "relative", value: "1h" },
+};
+
+test("builds a partitioned window query", () => {
+  const sql = buildQuery(
+    { ...query, fns: ["avg", "max"], filters: [{ key: "location", values: ["California.SanFrancisco"] }, { key: "groupid", values: [1, 2] }] },
+    meta,
+  );
+  assert.equal(
+    sql,
+    [
+      "SELECT TO_ISO8601(_wstart, 'Z') AS _time, tbname, AVG(`current`) AS `avg(current)`, MAX(`current`) AS `max(current)`",
+      "FROM `power`.`meters`",
+      "WHERE `ts` >= NOW - 1h",
+      "  AND `ts` < NOW",
+      "  AND `location` IN ('California.SanFrancisco')",
+      "  AND `groupid` IN (1, 2)",
+      "PARTITION BY tbname",
+      "INTERVAL(1m) FILL(NULL)",
+      "SLIMIT 20",
+    ].join("\n"),
+  );
+});
+
+test("no partition means no SLIMIT and no FILL for none", () => {
+  const sql = buildQuery({ ...query, groupBy: "", fill: "none" }, meta);
+  assert.match(sql, /^SELECT TO_ISO8601\(_wstart, 'Z'\) AS _time, AVG/);
+  assert.match(sql, /INTERVAL\(1m\)$/);
+  assert.doesNotMatch(sql, /SLIMIT|PARTITION|FILL/);
+});
+
+test("absolute ranges use RFC 3339 literals", () => {
+  const sql = buildQuery({ ...query, range: { type: "absolute", start: "2026-11-10T00:00:00Z", stop: "2026-11-10T01:00:00Z" } }, meta);
+  assert.match(sql, /`ts` >= '2026-11-10T00:00:00.000Z'\n {2}AND `ts` < '2026-11-10T01:00:00.000Z'/);
+  assert.throws(() => buildQuery({ ...query, range: { type: "absolute", start: "2026-11-10T01:00:00Z", stop: "2026-11-10T00:00:00Z" } }, meta));
+});
+
+test("auto window keeps every preset under the row cap", () => {
+  for (const range of RANGES)
+    for (const series of [1, 8, 20, 50, 100]) {
+      const window = autoWindow(durationMs(range), series);
+      const rows = (Math.ceil(durationMs(range) / durationMs(window)) + 1) * series;
+      assert.ok(rows <= MAX_ROWS, `${range} x ${series} series -> ${window} = ${rows} rows`);
+    }
+  assert.equal(autoWindow(durationMs("1h")), "10s"); // 360 points, like the InfluxDB UI
+});
+
+test("literals and identifiers are escaped", () => {
+  assert.equal(quoteString("it's \\ odd"), "'it''s \\\\ odd'");
+  assert.throws(() => quoteIdent("bad`name"));
+  assert.equal(filterClause({ key: "groupid", values: [1, null] }, "INT"), "(`groupid` IN (1) OR `groupid` IS NULL)");
+  assert.equal(filterClause({ key: "on", values: [true] }, "BOOL"), "`on` IN (true)");
+  assert.throws(() => filterClause({ key: "groupid", values: ["1; DROP"] }, "INT"));
+});
+
+test("tag values cascade from earlier filters", () => {
+  assert.equal(
+    tagValuesQuery({ database: "power", table: "meters", key: "tbname", filters: [{ key: "groupid", values: [3] }, { key: "location", values: [] }], tagTypes: meta.tagTypes }),
+    "SELECT DISTINCT tbname FROM `power`.`meters` WHERE `groupid` IN (3) LIMIT 1000",
+  );
+});

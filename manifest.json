@@ -1,0 +1,65 @@
+{
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
+  "manifest_version": 1,
+  "id": "com.example.tdengine-query-builder",
+  "name": "TDengine Query Builder",
+  "version": "0.1.0",
+  "publisher": "example",
+  "description": "InfluxDB-style query builder for TDengine connections: pick a supertable, filter by tags, aggregate by time window and chart the result.",
+  "icon": "assets/plugin.svg",
+  "permissions": ["host.data:read", "host.connections:read", "host.storage"],
+  "engines": { "dbx": ">=0.5.68", "host_api": "^1.4" },
+  "entrypoints": { "ui": { "root": "ui", "entry": "ui/index.html" } },
+  "contributions": [
+    {
+      "type": "workbench",
+      "id": "com.example.tdengine-query-builder.builder",
+      "label": "TDengine Query Builder",
+      "description": "Pick a supertable, filter by tags, aggregate by time window and chart the result.",
+      "icon": "assets/plugin.svg"
+    },
+    {
+      "type": "command",
+      "id": "com.example.tdengine-query-builder.open",
+      "label": "TDengine Query Builder",
+      "description": "Open a TDengine query builder tab.",
+      "icon": "assets/plugin.svg",
+      "action": { "type": "open-workbench", "workbench": "com.example.tdengine-query-builder.builder" }
+    },
+    {
+      "type": "menus",
+      "id": "com.example.tdengine-query-builder.menus",
+      "items": [
+        { "location": "appToolbar", "command": "com.example.tdengine-query-builder.open", "group": "navigation", "order": 100, "default_visible": true },
+        { "location": "commandPalette", "command": "com.example.tdengine-query-builder.open", "group": "primary", "order": 100 }
+      ]
+    },
+    {
+      "type": "context-menu",
+      "id": "com.example.tdengine-query-builder.table",
+      "label": "Open in TDengine Query Builder",
+      "menu": "table",
+      "action": { "type": "open-workbench", "workbench": "com.example.tdengine-query-builder.builder" }
+    }
+  ],
+  "localizations": {
+    "zh-CN": {
+      "name": "TDengine 查询构建器",
+      "description": "类似 InfluxDB 的 TDengine 查询构建器：选择超级表，按标签过滤，按时间窗口聚合并绘制图表。",
+      "contributions": {
+        "com.example.tdengine-query-builder.builder": { "label": "TDengine 查询构建器", "description": "选择超级表，按标签过滤，按时间窗口聚合并绘制图表。" },
+        "com.example.tdengine-query-builder.open": { "label": "TDengine 查询构建器", "description": "打开 TDengine 查询构建器标签页。" },
+        "com.example.tdengine-query-builder.table": { "label": "在 TDengine 查询构建器中打开" }
+      }
+    },
+    "pt-BR": {
+      "name": "Construtor de consultas TDengine",
+      "description": "Construtor de consultas no estilo do InfluxDB para conexões TDengine: escolha uma supertabela, filtre por tags, agregue por janela de tempo e veja o gráfico.",
+      "contributions": {
+        "com.example.tdengine-query-builder.builder": { "label": "Construtor de consultas TDengine", "description": "Escolha uma supertabela, filtre por tags, agregue por janela de tempo e veja o gráfico." },
+        "com.example.tdengine-query-builder.open": { "label": "Construtor de consultas TDengine", "description": "Abre uma aba do construtor de consultas TDengine." },
+        "com.example.tdengine-query-builder.table": { "label": "Abrir no construtor de consultas TDengine" }
+      }
+    }
+  }
+}
