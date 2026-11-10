@@ -2,6 +2,14 @@
 
 An InfluxDB 2 Data Explorer–style query builder for [DBX](https://github.com/t8y2/dbx) TDengine connections: pick a database and supertable, narrow it with cascading tag filters, choose fields and aggregate functions, and chart the result as a time series.
 
+![Query builder: cascading site and tbname filters, mean temperature per child table over the last 6 hours](docs/screenshots/builder.png)
+
+| SQL tab | Dark theme | Table context menu |
+| --- | --- | --- |
+| ![Generated TDengine SQL in the editable SQL tab](docs/screenshots/sql.png) | ![The same chart in DBX's dark theme](docs/screenshots/dark.png) | ![Open in TDengine Query Builder on a child table](docs/screenshots/context-menu.png) |
+
+New to DBX plugins? [`docs/dbx-plugin-system.md`](docs/dbx-plugin-system.md) explains how they are packaged, sandboxed and allowed to read data. Coding agents start at [`AGENTS.md`](AGENTS.md).
+
 - **Cards like the InfluxDB builder:** Database → Table → Fields → any number of tag filter cards. Each filter card lists the values left after the cards on its left (`SELECT DISTINCT tag … WHERE <earlier filters>`), `tbname` included.
 - **Aggregate panel:** window (`auto` keeps every series under the row cap, ~360 points like InfluxDB), fill, one series per child table / per tag / merged, max series, and mean, median ≈, min, max, sum, count, first, last, spread, stddev.
 - **Views:** graph (line, step, points; crosshair tooltip with every series), single stat, table.
