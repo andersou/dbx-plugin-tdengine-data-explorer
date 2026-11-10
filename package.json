@@ -1,5 +1,5 @@
 {
-  "name": "tdengine-data-explorer-dbx-plugin",
+  "name": "dbx-plugin-tdengine-data-explorer",
   "private": true,
   "type": "module",
   "scripts": {

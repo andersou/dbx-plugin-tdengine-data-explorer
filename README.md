@@ -61,4 +61,4 @@ The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` 
 
 ## Publishing
 
-Plugin ID `io.github.andersou.tdengine-data-explorer-dbx-plugin`, publisher `andersou`. A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review.
+Plugin ID `io.github.andersou.tdengine-data-explorer`, publisher `andersou`. A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review.

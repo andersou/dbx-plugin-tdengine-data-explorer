@@ -4,7 +4,7 @@ Guide for coding agents working on this repository. Read `README.md` for what th
 
 ## What this is
 
-TDengine Data Explorer (`tdengine-data-explorer-dbx-plugin`): a frontend-only DBX plugin (Svelte 5 + Vite 7, ECharts 6) that builds TDengine 3.x SQL from InfluxDB-style cards and charts the result. Every query runs through `window.dbxPlugin.queryData` on a TDengine connection DBX already has open. There is no sidecar and no driver in this repository.
+TDengine Data Explorer (`dbx-plugin-tdengine-data-explorer`): a frontend-only DBX plugin (Svelte 5 + Vite 7, ECharts 6) that builds TDengine 3.x SQL from InfluxDB-style cards and charts the result. Every query runs through `window.dbxPlugin.queryData` on a TDengine connection DBX already has open. There is no sidecar and no driver in this repository.
 
 ## Layout
 
@@ -62,7 +62,7 @@ Screenshots in `docs/screenshots/` were captured this way at 1920×1080; refresh
 
 ## Releasing
 
-- Never change the plugin ID `io.github.andersou.tdengine-data-explorer-dbx-plugin` or its contribution IDs: DBX keys installs, data grants, storage and restored tabs by them.
+- Never change the plugin ID `io.github.andersou.tdengine-data-explorer` or its contribution IDs: DBX keys installs, data grants, storage and restored tabs by them.
 - Bump `version` in `manifest.json` for every release; installed versions are immutable.
 - A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review and signing.
 
