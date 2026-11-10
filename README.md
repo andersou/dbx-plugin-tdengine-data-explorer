@@ -37,6 +37,10 @@ Metadata comes from `information_schema.ins_databases`, `ins_stables`/`ins_table
 
 Permissions: `host.data:read` (queries), `host.connections:read` (connection picker), `host.storage` (builder state per tab). Requires Host API `^1.4`.
 
+## Install
+
+Download `io.github.andersou.tdengine-data-explorer-<version>-universal.dbxp` from the [latest release](https://github.com/andersou/dbx-plugin-tdengine-data-explorer/releases/latest) (or paste its URL into **Install from URL**). The package is not signed by the DBX Store yet: enable **Plugin Center → Settings → Allow unsigned development packages**, and on the web/Docker build also start DBX with `DBX_ALLOW_UNSIGNED_PLUGINS=1` (needed only while installing).
+
 ## Develop
 
 ```bash
@@ -44,7 +48,7 @@ npm install
 npm run build          # src/ -> ui/ (one chunk on purpose, see vite.config.js)
 npm test               # SQL builder and series pivot
 TDENGINE_URL=http://localhost:6041 npm test   # also runs every generated query on a real TDengine
-npx @dbx-app/plugin-cli package .             # dist/*-universal.dbxp (unsigned)
+npx dbx-plugin package .                      # dist/*-0.0.0-dev-universal.dbxp (unsigned)
 ```
 
 The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` (the SDK browser host) only mocks the Host API and cannot run `queryData`, so test data flows in a real DBX:
@@ -59,6 +63,8 @@ The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` 
 - Timestamps in hand-written SQL are read in the server time zone with one fixed offset (`SELECT timezone()`); builder queries are exact because they use `TO_ISO8601(…, 'Z')`.
 - Not included: auto-refresh, saved queries, a `result-view` for the SQL editor, raw (non-aggregated) builder mode, plugin UI translations.
 
-## Publishing
+## Releases
 
-Plugin ID `io.github.andersou.tdengine-data-explorer`, publisher `andersou`. A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review.
+`.github/workflows/ci-release.yml` runs on every push and pull request to `main` and `develop`: unit and TDengine integration tests (against `tdengine/tdengine:3.3.6.13`), the UI build and the `.dbxp`. On pushes, semantic-release picks the version from [Conventional Commits](https://www.conventionalcommits.org/) (`feat` → minor; `fix`, `perf`, `revert` → patch; breaking change → major) and publishes a `vX.Y.Z` GitHub release with the `.dbxp`, its `.artifact.json` (target, URL, SHA-256 and size for a DBX Store candidate) and `SHA256SUMS`; `develop` publishes `-beta` prereleases. The version is stamped into `manifest.json` at build time, so the file keeps `0.0.0-dev` in git and no release commit is made.
+
+Plugin ID `io.github.andersou.tdengine-data-explorer`, publisher `andersou`.

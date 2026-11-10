@@ -19,6 +19,7 @@ TDengine Data Explorer (`dbx-plugin-tdengine-data-explorer`): a frontend-only DB
 | `src/Chart.svelte` | ECharts wrapper: validated palette, DBX theme tokens, axis tooltip |
 | `test/` | `node:test` suites; `tdengine.test.js` runs generated SQL on a real TDengine |
 | `docs/` | Plugin system notes and README screenshots |
+| `.github/workflows/ci-release.yml`, `release.config.mjs`, `scripts/semantic-release.mjs` | CI, `.dbxp` packaging and semantic-release (same layout as `andersou/webdiffviewer`) |
 | `ui/`, `dist/` | Build output and packages (gitignored) |
 
 ## Commands
@@ -28,10 +29,11 @@ npm install
 npm run build                                   # src/ -> ui/
 npm test                                        # unit tests
 TDENGINE_URL=http://localhost:6041 npm test     # + every SQL shape on a real TDengine (needs taosBenchmark -y -d power data)
-npx @dbx-app/plugin-cli package .               # dist/*-universal.dbxp
+npx dbx-plugin package .                        # dist/*-0.0.0-dev-universal.dbxp
+GH_TOKEN=$(gh auth token) npm run release:dry-run -- --no-ci   # next version semantic-release would publish
 ```
 
-Run `npm test` and `npm run build` before every commit. Run the TDengine suite whenever `src/lib/sql.js` changes.
+Run `npm test` and `npm run build` before every commit. Run the TDengine suite whenever `src/lib/sql.js` changes. Commit messages follow Conventional Commits because they decide the next version.
 
 ## Invariants
 
@@ -63,8 +65,9 @@ Screenshots in `docs/screenshots/` were captured this way at 1920×1080; refresh
 ## Releasing
 
 - Never change the plugin ID `io.github.andersou.tdengine-data-explorer` or its contribution IDs: DBX keys installs, data grants, storage and restored tabs by them.
-- Bump `version` in `manifest.json` for every release; installed versions are immutable.
-- A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review and signing.
+- Never bump `version` by hand: `manifest.json` keeps `0.0.0-dev`, and `ci-release.yml` stamps the semantic-release version (or `0.0.0-dev.<sha>`) into it before packaging. No release commit is made.
+- Versions come from Conventional Commits on `main`: `feat` → minor; `fix`, `perf`, `revert` → patch; breaking change → major; `docs`, `chore`, `ci`, `test`, `refactor`, `style`, `build` → no release. `develop` publishes `-beta` prereleases.
+- A release `vX.Y.Z` carries the `.dbxp`, its `.artifact.json` and `SHA256SUMS`. DBX Store submission is still manual: a candidate PR to `t8y2/dbx-store` with the release asset URL and the `.artifact.json` values.
 
 ## Not built yet
 

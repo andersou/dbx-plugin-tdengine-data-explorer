@@ -23,8 +23,11 @@ test("generated SQL runs on TDengine", { skip: !url && "set TDENGINE_URL" }, asy
   const tagTypes = Object.fromEntries(described.rows.filter((row) => row[3] === "TAG").map(([name, type]) => [name, type]));
   assert.deepEqual(Object.keys(tagTypes), ["groupid", "location"]);
 
-  const [[location]] = (await run(tagValuesQuery({ database: "power", table: "meters", key: "location", filters: [{ key: "groupid", values: [1, 2] }], tagTypes }))).rows;
-  const filters = [{ key: "location", values: [location, null] }, { key: "groupid", values: [1, 2, 3] }];
+  // Pick filter values from the data so any taosBenchmark seed size matches rows.
+  const values = async (key, filters = []) => (await run(tagValuesQuery({ database: "power", table: "meters", key, filters, tagTypes }))).rows.map(([value]) => value);
+  const [groupid] = await values("groupid");
+  const [location] = await values("location", [{ key: "groupid", values: [groupid] }]);
+  const filters = [{ key: "location", values: [location, null] }, { key: "groupid", values: [groupid] }];
   const [[first]] = (await run("SELECT TO_ISO8601(FIRST(ts), 'Z') FROM power.meters")).rows;
   const range = { type: "absolute", start: first, stop: new Date(Date.parse(first) + 3600e3).toISOString() };
   const base = { database: "power", table: "meters", fields: ["current", "voltage"], fns: ["avg"], filters, groupBy: "tbname", fill: "null", window: "auto", maxSeries: 20, range };

@@ -189,7 +189,7 @@ TDengine specifics (`agents/drivers/tdengine/`):
   - `dbx-plugin keygen` (custom repository signing keys)
 - `dbx-plugin.toml`: `[package] include = [...]`, `[dev] ui_build/ui_watch` commands.
 - The dev host is mock-only: no `queryData`, one fake SQLite connection, no `capabilities`, no UI kit. Test data paths in a real DBX.
-- Release: the plugin repository's `.github/workflows/plugin-release.yml` (calling `t8y2/dbx`'s reusable workflow) builds unsigned candidates on a GitHub release; DBX Store (`t8y2/dbx-store`) reviews them, signs approved bytes and publishes the catalog entry. Plugin source stays in the author's repository; `t8y2/dbx` only takes host, SDK, CLI, schema and documentation changes.
+- Release: the `dbx-plugin create` templates ship `.github/workflows/plugin-release.yml` (calling `t8y2/dbx`'s reusable workflow), which builds unsigned candidates on a GitHub release (this repository replaces it with `ci-release.yml` and semantic-release); DBX Store (`t8y2/dbx-store`) reviews them, signs approved bytes and publishes the catalog entry. Plugin source stays in the author's repository; `t8y2/dbx` only takes host, SDK, CLI, schema and documentation changes.
 
 ## 10. Security model in one list
 
