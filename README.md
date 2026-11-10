@@ -59,6 +59,6 @@ The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` 
 - Timestamps in hand-written SQL are read in the server time zone with one fixed offset (`SELECT timezone()`); builder queries are exact because they use `TO_ISO8601(…, 'Z')`.
 - Not included: auto-refresh, saved queries, a `result-view` for the SQL editor, raw (non-aggregated) builder mode, plugin UI translations.
 
-## Before publishing
+## Publishing
 
-`com.example.tdengine-data-explorer-dbx-plugin` and publisher `example` are placeholders; set your own ID and publisher in `manifest.json` (and the contribution IDs that repeat the plugin ID) before the first release. `.github/workflows/plugin-release.yml` builds the unsigned candidate for DBX Store review.
+Plugin ID `io.github.andersou.tdengine-data-explorer-dbx-plugin`, publisher `andersou`. A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review.

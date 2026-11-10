@@ -62,7 +62,7 @@ Screenshots in `docs/screenshots/` were captured this way at 1920×1080; refresh
 
 ## Releasing
 
-- `com.example.tdengine-data-explorer-dbx-plugin` and publisher `example` are placeholders; replace them (and the contribution IDs that repeat the plugin ID) before the first store release.
+- Never change the plugin ID `io.github.andersou.tdengine-data-explorer-dbx-plugin` or its contribution IDs: DBX keys installs, data grants, storage and restored tabs by them.
 - Bump `version` in `manifest.json` for every release; installed versions are immutable.
 - A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review and signing.
 
