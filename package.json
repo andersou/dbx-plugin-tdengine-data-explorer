@@ -1,5 +1,5 @@
 {
-  "name": "com.example.tdengine-query-builder-ui",
+  "name": "tdengine-data-explorer-dbx-plugin",
   "private": true,
   "type": "module",
   "scripts": {

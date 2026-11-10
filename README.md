@@ -1,12 +1,12 @@
-# TDengine Query Builder for DBX
+# TDengine Data Explorer for DBX
 
-An InfluxDB 2 Data Explorer–style query builder for [DBX](https://github.com/t8y2/dbx) TDengine connections: pick a database and supertable, narrow it with cascading tag filters, choose fields and aggregate functions, and chart the result as a time series.
+A [DBX](https://github.com/t8y2/dbx) plugin modeled on the InfluxDB 2 Data Explorer, for TDengine connections: pick a database and supertable, narrow it with cascading tag filters, choose fields and aggregate functions, and chart the result as a time series.
 
-![Query builder: cascading site and tbname filters, mean temperature per child table over the last 6 hours](docs/screenshots/builder.png)
+![TDengine Data Explorer: cascading site and tbname filters, mean temperature per child table over the last 6 hours](docs/screenshots/builder.png)
 
 | SQL tab | Dark theme | Table context menu |
 | --- | --- | --- |
-| ![Generated TDengine SQL in the editable SQL tab](docs/screenshots/sql.png) | ![The same chart in DBX's dark theme](docs/screenshots/dark.png) | ![Open in TDengine Query Builder on a child table](docs/screenshots/context-menu.png) |
+| ![Generated TDengine SQL in the editable SQL tab](docs/screenshots/sql.png) | ![The same chart in DBX's dark theme](docs/screenshots/dark.png) | ![Open in TDengine Data Explorer on a child table](docs/screenshots/context-menu.png) |
 
 New to DBX plugins? [`docs/dbx-plugin-system.md`](docs/dbx-plugin-system.md) explains how they are packaged, sandboxed and allowed to read data. Coding agents start at [`AGENTS.md`](AGENTS.md).
 
@@ -14,7 +14,7 @@ New to DBX plugins? [`docs/dbx-plugin-system.md`](docs/dbx-plugin-system.md) exp
 - **Aggregate panel:** window (`auto` keeps every series under the row cap, ~360 points like InfluxDB), fill, one series per child table / per tag / merged, max series, and mean, median ≈, min, max, sum, count, first, last, spread, stddev.
 - **Views:** graph (line, step, points; crosshair tooltip with every series), single stat, table.
 - **SQL tab:** shows the generated SQL; edit it or write your own read-only query (Ctrl+Enter).
-- **Entry points:** the app toolbar / command palette, and **Open in TDengine Query Builder** on a table's context menu. A child table opens as its supertable filtered to that `tbname`.
+- **Entry points:** the app toolbar / command palette, and **Open in TDengine Data Explorer** on a table's context menu. A child table opens as its supertable filtered to that `tbname`.
 
 ## How it works
 
@@ -61,4 +61,4 @@ The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` 
 
 ## Before publishing
 
-`com.example.tdengine-query-builder` and publisher `example` are placeholders; set your own ID, publisher, `source` and `homepage` in `manifest.json` (and the contribution IDs that repeat the plugin ID) before the first release. `.github/workflows/plugin-release.yml` builds the unsigned candidate for DBX Store review.
+`com.example.tdengine-data-explorer-dbx-plugin` and publisher `example` are placeholders; set your own ID and publisher in `manifest.json` (and the contribution IDs that repeat the plugin ID) before the first release. `.github/workflows/plugin-release.yml` builds the unsigned candidate for DBX Store review.

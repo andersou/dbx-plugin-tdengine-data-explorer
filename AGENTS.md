@@ -4,7 +4,7 @@ Guide for coding agents working on this repository. Read `README.md` for what th
 
 ## What this is
 
-A frontend-only DBX plugin (Svelte 5 + Vite 7, ECharts 6) that builds TDengine 3.x SQL from InfluxDB-style cards and charts the result. Every query runs through `window.dbxPlugin.queryData` on a TDengine connection DBX already has open. There is no sidecar and no driver in this repository.
+TDengine Data Explorer (`tdengine-data-explorer-dbx-plugin`): a frontend-only DBX plugin (Svelte 5 + Vite 7, ECharts 6) that builds TDengine 3.x SQL from InfluxDB-style cards and charts the result. Every query runs through `window.dbxPlugin.queryData` on a TDengine connection DBX already has open. There is no sidecar and no driver in this repository.
 
 ## Layout
 
@@ -62,7 +62,7 @@ Screenshots in `docs/screenshots/` were captured this way at 1920×1080; refresh
 
 ## Releasing
 
-- `com.example.tdengine-query-builder` and publisher `example` are placeholders; replace them (and the contribution IDs that repeat the plugin ID, plus `source`/`homepage`) before the first public release.
+- `com.example.tdengine-data-explorer-dbx-plugin` and publisher `example` are placeholders; replace them (and the contribution IDs that repeat the plugin ID) before the first store release.
 - Bump `version` in `manifest.json` for every release; installed versions are immutable.
 - A GitHub release runs `.github/workflows/plugin-release.yml`, which builds the unsigned candidate for DBX Store review and signing.
 

@@ -238,7 +238,7 @@
       await host.storage.set(`state:${stateKey}`, snapshot);
       await host.storage.set("state-index", [stateKey, ...index]);
     } catch (e) {
-      console.warn("Could not save the query builder state", e); // best effort, queries are unaffected
+      console.warn("Could not save the data explorer state", e); // best effort, queries are unaffected
     }
   }
 
@@ -266,7 +266,7 @@
   });
 </script>
 
-<svelte:head><title>TDengine Query Builder</title></svelte:head>
+<svelte:head><title>TDengine Data Explorer</title></svelte:head>
 
 <main class="app">
   <header class="toolbar">
