@@ -110,8 +110,9 @@
 
   // queryData rejects a 5th concurrent call; one at a time also spares the pool DBX tabs share.
   let queue = Promise.resolve();
-  function run(sql, maxRows = MAX_ROWS, connectionId = query.connectionId) {
-    const next = queue.then(() => host.queryData({ connectionId, sql, maxRows, timeoutMs: 60000 }));
+  function run(sql, { connectionId = query.connectionId, isStale } = {}) {
+    // A load abandoned while it waited never reaches the server, so it cannot delay the queries behind it.
+    const next = queue.then(() => (isStale?.() ? Promise.reject(new Error("stale")) : host.queryData({ connectionId, sql, maxRows: MAX_ROWS, timeoutMs: 60000 })));
     queue = next.catch(() => {});
     return next;
   }
@@ -122,9 +123,9 @@
   }
 
   // Applies a load result unless a newer run of the same effect replaced it.
-  function track(promise, apply) {
+  function track(load, apply) {
     let stale = false;
-    promise.then(
+    load(() => stale).then(
       (value) => !stale && apply(value),
       (e) => !stale && (error = explain(e)),
     );
@@ -138,7 +139,7 @@
   $effect(() => {
     void reloadTick;
     if (!canQuery()) return;
-    return track(Promise.all([run(databasesQuery()), run(timezoneQuery())]), ([dbs, timezone]) => {
+    return track((isStale) => Promise.all([run(databasesQuery(), { isStale }), run(timezoneQuery(), { isStale })]), ([dbs, timezone]) => {
       databases = dbs.rows.map(([name]) => name);
       offset = parseOffset(timezone.rows[0]?.[0]);
     });
@@ -147,13 +148,13 @@
   $effect(() => {
     void reloadTick;
     if (!canQuery() || !query.database) return void (tables = []);
-    return track(run(tablesQuery(query.database)), ({ rows }) => (tables = rows.map(([name, kind]) => ({ name, kind }))));
+    return track((isStale) => run(tablesQuery(query.database), { isStale }), ({ rows }) => (tables = rows.map(([name, kind]) => ({ name, kind }))));
   });
 
   $effect(() => {
     void reloadTick;
     if (!canQuery() || !query.database || !query.table) return void (meta = EMPTY_META);
-    return track(run(describeQuery(query.database, query.table)), ({ rows }) => applyMeta(rows));
+    return track((isStale) => run(describeQuery(query.database, query.table), { isStale }), ({ rows }) => applyMeta(rows));
   });
 
   function applyMeta(rows) {
@@ -174,10 +175,10 @@
     if (query.groupBy && !tagKeys.includes(query.groupBy)) query.groupBy = tagKeys.length ? "tbname" : "";
   }
 
-  function fetchTagValues(key, upstream) {
+  function fetchTagValues(key, upstream, isStale) {
     const sql = tagValuesQuery({ database: query.database, table: query.table, key, filters: upstream, tagTypes: meta.tagTypes });
     void reloadTick;
-    return run(sql).then(({ rows }) =>
+    return run(sql, { isStale }).then(({ rows }) =>
       rows.map(([value]) => value).sort((a, b) => (a === null) - (b === null) || String(a).localeCompare(String(b), undefined, { numeric: true })),
     );
   }
@@ -221,7 +222,7 @@
     running = true;
     loading = !quiet;
     try {
-      result = await run(sql, MAX_ROWS, connectionId);
+      result = await run(sql, { connectionId });
       series = toSeries(result, { offset, labels });
     } catch (e) {
       error = explain(e);

@@ -13,7 +13,7 @@
     let stale = false;
     loading = true;
     // fetchValues reads key and upstream synchronously, so both are tracked.
-    fetchValues(filter.key, upstream)
+    fetchValues(filter.key, upstream, () => stale)
       .then((values) => {
         if (stale) return;
         items = values.map((value) => ({ value, label: value === null ? "(null)" : String(value) }));
