@@ -402,6 +402,8 @@
   <section class="result">
     {#if unsupported}
       <p class="empty dbx-hint">{t("unsupported", { name: current.name, dbType: current.dbType })}</p>
+    {:else if ready && query.connectionId && !canQuery()}
+      <p class="empty dbx-hint">{t("unlisted")}</p>
     {:else if query.view === "table" && result}
       <div class="table-wrap">
         <table class="dbx-table">
