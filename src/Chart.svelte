@@ -16,12 +16,17 @@
   const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 });
 
   // themeTick changes on every DBX theme push, including palette swaps that keep the appearance.
-  let { series, kind = "line", dark = false, themeTick = 0, loading = false } = $props();
+  let { series, kind = "line", dark = false, themeTick = 0, loading = false, zoomed = $bindable(false) } = $props();
   let element;
   let chart = $state();
 
   $effect(() => {
     const instance = init(element);
+    // Lets auto-refresh wait instead of throwing away the user's zoom.
+    instance.on("datazoom", () => {
+      const [{ start, end }] = instance.getOption().dataZoom;
+      zoomed = start > 0 || end < 100;
+    });
     const observer = new ResizeObserver(() => instance.resize());
     observer.observe(element);
     chart = instance;
@@ -73,6 +78,7 @@
       },
       { notMerge: true },
     );
+    zoomed = false; // notMerge also resets the zoom
   });
 </script>
 

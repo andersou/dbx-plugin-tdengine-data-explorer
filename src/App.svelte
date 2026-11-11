@@ -33,6 +33,7 @@
     ["step", "Step"],
     ["points", "Points"],
   ];
+  const REFRESH_INTERVALS = ["10s", "30s", "1m", "5m"];
   const FILL_LABELS = { none: "none", null: "null (gaps)", prev: "previous", linear: "linear", zero: "zero" };
   const FN_ITEMS = Object.keys(FUNCTIONS).map((fn) => ({ value: fn, label: { avg: "mean", median: "median ≈" }[fn] ?? fn }));
   const DEFAULT_QUERY = {
@@ -67,6 +68,10 @@
   let result = $state(null);
   let series = $state([]);
   let running = $state(false);
+  let loading = $state(false); // a run the user started; auto-refresh ticks keep the frame undimmed
+  let refresh = $state(""); // not part of query: a restored tab must never start querying on its own
+  let zoomed = $state(false);
+  let lastRun = null;
   let error = $state("");
   let ready = $state(false);
   let reloadTick = $state(0);
@@ -96,8 +101,7 @@
 
   // queryData rejects a 5th concurrent call; one at a time also spares the pool DBX tabs share.
   let queue = Promise.resolve();
-  function run(sql, maxRows = MAX_ROWS) {
-    const connectionId = query.connectionId;
+  function run(sql, maxRows = MAX_ROWS, connectionId = query.connectionId) {
     const next = queue.then(() => host.queryData({ connectionId, sql, maxRows, timeoutMs: 60000 }));
     queue = next.catch(() => {});
     return next;
@@ -174,6 +178,7 @@
 
   function setRange(value) {
     if (value !== "custom") return void (query.range = { type: "relative", value });
+    refresh = "";
     const ms = query.range.type === "relative" ? durationMs(query.range.value) : 3600e3;
     query.range = { type: "absolute", start: toLocalInput(Date.now() - ms), stop: toLocalInput(Date.now()) };
   }
@@ -185,8 +190,7 @@
     query.mode = mode;
   }
 
-  async function submit() {
-    error = "";
+  function submit() {
     let sql;
     try {
       sql = query.mode === "sql" ? query.sql.trim() : buildQuery(query, meta);
@@ -194,16 +198,32 @@
     } catch (e) {
       return void (error = e.message);
     }
+    lastRun = { sql, labels: query.mode === "builder" && query.groupBy ? [query.groupBy] : [], connectionId: query.connectionId };
+    execute(lastRun);
+  }
+
+  async function execute({ sql, labels, connectionId }, quiet = false) {
+    error = "";
     running = true;
+    loading = !quiet;
     try {
-      result = await run(sql, MAX_ROWS);
-      series = toSeries(result, { offset, labels: query.mode === "builder" && query.groupBy ? [query.groupBy] : [] });
+      result = await run(sql, MAX_ROWS, connectionId);
+      series = toSeries(result, { offset, labels });
     } catch (e) {
       error = explain(e);
+      refresh = ""; // a closed connection or a denied consent would fail on every tick
     } finally {
-      running = false;
+      running = loading = false;
     }
   }
+
+  // Ticks repeat the last submitted query, never a half-edited builder; NOW-relative SQL returns fresh rows.
+  $effect(() => {
+    if (!refresh || query.range.type !== "relative") return;
+    // shortcut: keeps ticking in background DBX tabs (Host API 1.4 has no tab-visibility signal), pause there once DBX exposes one.
+    const timer = setInterval(() => lastRun && !running && !zoomed && execute(lastRun, true), durationMs(refresh));
+    return () => clearInterval(timer);
+  });
 
   async function refreshConnections() {
     if (host.capabilities?.connectionsApi) allConnections = await host.getConnections().catch(() => allConnections);
@@ -275,7 +295,10 @@
       aria-label="Connection"
       value={query.connectionId}
       onfocus={refreshConnections}
-      onchange={(e) => Object.assign(query, { connectionId: e.currentTarget.value, database: "", table: "", fields: [], filters: [] })}
+      onchange={(e) => {
+        refresh = "";
+        Object.assign(query, { connectionId: e.currentTarget.value, database: "", table: "", fields: [], filters: [] });
+      }}
     >
       <option value="" disabled>{connections.length ? "Choose a TDengine connection" : "No TDengine connection in DBX"}</option>
       {#each connections as connection (connection.id)}
@@ -305,6 +328,10 @@
       <input class="dbx-input" type="datetime-local" aria-label="Start" bind:value={query.range.start} />
       <input class="dbx-input" type="datetime-local" aria-label="Stop" bind:value={query.range.stop} />
     {/if}
+    <select class="dbx-select" aria-label="Auto-refresh" bind:value={refresh} disabled={query.range.type !== "relative"}>
+      <option value="">Auto-refresh off</option>
+      {#each REFRESH_INTERVALS as interval (interval)}<option value={interval}>Every {interval}</option>{/each}
+    </select>
     <button class="dbx-btn dbx-btn--primary" type="button" disabled={running || !query.connectionId || unsupported} onclick={submit}>Submit</button>
   </header>
 
@@ -324,15 +351,15 @@
         {#if result.rows.length > 1000}<p class="dbx-hint">Showing 1000 of {result.rows.length} rows.</p>{/if}
       </div>
     {:else if query.view === "stat" && series.length}
-      <div class="stat" class:dim={running}>
+      <div class="stat" class:dim={loading}>
         <strong>{lastValue(series[0]) === null ? "—" : numberFormat.format(lastValue(series[0]))}</strong>
         <span class="dbx-hint">{series[0].name}{series.length > 1 ? ` · first of ${series.length} series` : ""}</span>
       </div>
     {:else if series.length}
-      <Chart {series} kind={query.kind} {dark} {themeTick} loading={running} />
+      <Chart {series} kind={query.kind} {dark} {themeTick} {loading} bind:zoomed />
     {:else}
       <p class="empty dbx-hint">
-        {running ? "Running…" : result ? (result.rows.length ? "The result has no time column; open the Table view." : "No data in this time range.") : "Build a query below, then press Submit."}
+        {loading ? "Running…" : result ? (result.rows.length ? "The result has no time column; open the Table view." : "No data in this time range.") : "Build a query below, then press Submit."}
       </p>
     {/if}
   </section>
@@ -342,7 +369,7 @@
       <button class="tab" class:active={query.mode === "builder"} role="tab" aria-selected={query.mode === "builder"} type="button" onclick={() => setMode("builder")}>Query Builder</button>
       <button class="tab" class:active={query.mode === "sql"} role="tab" aria-selected={query.mode === "sql"} type="button" onclick={() => setMode("sql")}>SQL</button>
       <span class="status" class:error role="status">
-        {#if error}{error}{:else if running}Running…{:else if result}{result.rows.length} rows · {result.elapsedMs} ms{result.truncated ? ` · truncated at ${MAX_ROWS} rows: shorten the range or widen the window` : ""}{/if}
+        {#if error}{error}{:else if loading}Running…{:else if result}{result.rows.length} rows · {result.elapsedMs} ms{result.truncated ? ` · truncated at ${MAX_ROWS} rows: shorten the range or widen the window` : ""}{refresh ? (zoomed ? " · auto-refresh paused while zoomed" : ` · refreshing every ${refresh}`) : ""}{/if}
       </span>
     </div>
 
