@@ -107,6 +107,8 @@
       return "";
     }
   });
+  // SLIMIT keeps the first maxSeries partitions, so reaching it may hide the rest; the partition column follows _time.
+  const seriesCapped = $derived(!!result && !!lastRun?.labels.length && new Set(result.rows.map((row) => row[1])).size >= lastRun.maxSeries);
 
   // queryData rejects a 5th concurrent call; one at a time also spares the pool DBX tabs share.
   let queue = Promise.resolve();
@@ -213,7 +215,7 @@
     if (!sql) return void (error = t("writeSelect"));
     const raw = query.mode === "builder" && query.window === "raw";
     // Raw rows split by tbname, a text column toSeries labels on its own.
-    lastRun = { sql, raw, labels: query.mode === "builder" && !raw && query.groupBy ? [query.groupBy] : [], connectionId: query.connectionId };
+    lastRun = { sql, raw, labels: query.mode === "builder" && !raw && query.groupBy ? [query.groupBy] : [], maxSeries: query.maxSeries, connectionId: query.connectionId };
     execute(lastRun);
   }
 
@@ -453,7 +455,7 @@
         </div>
       {/if}
       <span class="status" class:error role="status">
-        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
+        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{seriesCapped ? ` · ${t("seriesCapped", { max: lastRun.maxSeries })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
       </span>
     </div>
 
