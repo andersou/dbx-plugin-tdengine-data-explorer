@@ -458,7 +458,7 @@
         </div>
       {/if}
       <span class="status" class:error role="status">
-        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{seriesCapped ? ` · ${t("seriesCapped", { max: lastRun.maxSeries })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
+        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t(result.rows.length === 1 ? "rowStatus" : "rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{seriesCapped ? ` · ${t("seriesCapped", { max: lastRun.maxSeries })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
       </span>
     </div>
 
