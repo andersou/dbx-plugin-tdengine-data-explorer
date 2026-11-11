@@ -39,7 +39,7 @@ SLIMIT 20
 
 Metadata comes from `information_schema.ins_databases`, `ins_stables`/`ins_tables` and `DESCRIBE`.
 
-Permissions: `host.data:read` (queries), `host.connections:read` (connection picker), `host.storage` (builder state per tab). Requires Host API `^1.4`.
+Permissions: `host.data:read` (queries), `host.connections:read` (connection picker), `host.storage` (builder state per tab and saved queries). Requires Host API `^1.4`.
 
 ## Install
 
@@ -52,7 +52,7 @@ The package is not signed by the DBX Store yet: enable **Allow unsigned developm
 ```bash
 npm install
 npm run build          # src/ -> ui/ (one chunk on purpose, see vite.config.js)
-npm test               # SQL builder and series pivot
+npm test               # SQL builder, series pivot, saved queries and translations
 TDENGINE_URL=http://localhost:6041 npm test   # also runs every generated query on a real TDengine
 npx dbx-plugin package .                      # dist/*-0.0.0-dev-universal.dbxp (unsigned)
 ```
@@ -65,6 +65,7 @@ The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` 
 ## Limits
 
 - `queryData` returns at most 5000 rows; a truncated result says so in the status line. Shorten the range, widen the window or lower max series.
+- Max series (1 to 100) is applied with `SLIMIT`, so a supertable with more child tables shows only some of them; the status line says when a result reaches the limit.
 - DBX cannot scope context-menu entries to one database type, so the table menu entry also shows on other connections; the builder refuses non-TDengine connections without querying them.
 - Timestamps in hand-written SQL are read in the server time zone with one fixed offset (`SELECT timezone()`); builder queries are exact because they use `TO_ISO8601(…, 'Z')`.
 - Auto-refresh keeps running while its DBX tab is in the background: Host API 1.4 gives plugins no tab-visibility signal.

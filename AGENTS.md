@@ -13,6 +13,9 @@ TDengine Data Explorer (`dbx-plugin-tdengine-data-explorer`): a frontend-only DB
 | `manifest.json` | Plugin identity, permissions (`host.data:read`, `host.connections:read`, `host.storage`), contributions (workbench, command + toolbar/palette menus, table context menu) |
 | `src/lib/sql.js` | Pure SQL generation: builder query, metadata queries, quoting, auto window, row cap |
 | `src/lib/series.js` | Pure pivot of a `queryData` result into chart series; timestamp parsing |
+| `src/lib/saved.js` | Pure saved-query list operations (upsert, remove, `MAX_SAVED` cap) |
+| `src/lib/i18n.js` | UI strings for en, zh-CN and pt-BR, and `translate` with language fallback |
+| `src/main.js` | Mounts `App.svelte` |
 | `src/App.svelte` | State, host calls (serial `run()` queue), metadata effects, context handling, state persistence, layout |
 | `src/FilterCard.svelte` | One cascading tag filter card (fetches its own values) |
 | `src/Picker.svelte` | Searchable single/multi-select list used by the cards |
@@ -37,22 +40,22 @@ Run `npm test` and `npm run build` before every commit. Run the TDengine suite w
 
 ## Invariants
 
-- **Data path:** only `window.dbxPlugin.queryData`, always through `run()` in `App.svelte`. The host rejects a fifth concurrent call instead of queueing it, so never call `queryData` directly.
+- **Data path:** only `window.dbxPlugin.queryData`, always through `run()` in `App.svelte`. The host rejects a fifth concurrent call instead of queueing it, so never call `queryData` directly. Effect-driven loads pass their stale check (`isStale`) so a load abandoned while queued never runs.
 - **SQL:** one read-only statement per call, never `USE`. Use fully qualified backticked names via `quoteIdent`, literals via `quoteString`/`literal`, and do not pass `database`/`schema` to `queryData` (the TDengine agent turns them into `USE`).
 - **Timestamps:** builder queries select `TO_ISO8601(_wstart, 'Z') AS _time`; the agent otherwise returns offset-less strings in the server time zone.
-- **Row cap:** `queryData` returns at most `MAX_ROWS` (5000). `autoWindow` and `SLIMIT` keep builder results under it; keep that true for any new query shape and extend the "under the row cap" test.
-- **TDengine syntax:** `FILL(VALUE, …)` needs one value per aggregate column; `DISTINCT` tag queries are the cascade; `DESCRIBE` provides columns and tags (`note = "TAG"`).
+- **Row cap:** `queryData` returns at most `MAX_ROWS` (5000). `autoWindow` and `SLIMIT` keep builder results under it for max series 1 to `MAX_SERIES` (100), which `buildQuery` enforces; keep that true for any new query shape and extend the "under the row cap" test.
+- **TDengine syntax:** `FILL(VALUE, …)` needs one value per aggregate column; `DISTINCT` tag queries are the cascade; `DESCRIBE` provides columns and tags (`note = "TAG"`); FLOAT filters use `=`, because an `IN` list compares as DOUBLE and never matches a FLOAT value.
 - **Bundle:** one JS chunk and one CSS file. No dynamic `import()` and no lazily injected CSS: DBX inlines the entry module on the web build. Keep ECharts imports piecewise (`echarts/core` plus the charts and components in use).
 - **Sandbox:** no `localStorage` (opaque origin), no network. Persist through `saveState` (`host.storage`, 256 KiB per value, 1 MiB total, pruned to 20 tab states).
 - **Host features:** gate optional APIs on `host.capabilities?.x`; older hosts and the SDK dev host omit them.
 - **UI:** use the DBX UI kit classes (`dbx-card`, `dbx-btn`, `dbx-select`, …) and `--color-*` tokens so light/dark and custom palettes follow DBX. Chart colors come from the validated 8-slot palette in `Chart.svelte`; series 9+ are gray. Do not add hues.
 - **Untrusted text:** database values reach the DOM only through Svelte interpolation; never `{@html}`.
-- **Context menu:** the table menu entry shows on every database type (DBX cannot scope it without a sidecar). The workbench must keep refusing non-TDengine connections without querying them, so no consent prompt appears for them.
+- **Context menu:** the table menu entry shows on every database type (DBX cannot scope it without a sidecar). The workbench must keep refusing non-TDengine connections without querying them, so no consent prompt appears for them. `canQuery()` is the one gate for every query (metadata effects, context, Submit and Ctrl+Enter); with the connections API it also refuses a connection DBX does not list.
 - **Restoring a tab never runs a query:** state restore, context changes and opening a saved query only load metadata; the user presses Submit. The auto-refresh interval stays out of `query` so it is never saved.
 - **Auto-refresh** repeats the last submitted query (`lastRun`), skips ticks while running or zoomed, and turns itself off on any error.
 - **Raw mode** (`window: "raw"`) is `ORDER BY ts DESC LIMIT MAX_ROWS` without `PARTITION BY`: under `ORDER BY`, TDengine sorts partitions as one stream, so per-series limits are not available in one query.
 - **Strings:** every UI string goes through `t()` with keys in all three tables of `src/lib/i18n.js` (`test/i18n.test.js` enforces matching keys and placeholders). Validation errors from `sql.js` carry a `code` that is also a message key.
-- **Saved queries** live in one global `host.storage` key (`saved`, newest first, `MAX_SAVED` 50) without `connectionId`; re-read before writing.
+- **Saved queries** live in one global `host.storage` key (`saved`, newest first, `MAX_SAVED` 50) without `connectionId`; re-read before writing, and write nothing when that read fails.
 
 ## Testing in a real DBX
 
@@ -62,7 +65,7 @@ Run `npm test` and `npm run build` before every commit. Run the TDengine suite w
 2. In DBX: Driver Manager → install TDengine; New Connection → TDengine (host = the TDengine container, port 6041, `root`/`taosdata`).
 3. Plugin Center → Settings → *Allow unsigned development packages* → install `dist/*.dbxp`. Reinstalling the same version needs Uninstall first.
 4. The web build asks for data consent with `window.confirm`; headless browsers dismiss it unless the automation accepts dialogs, and a denial sticks until the tab is reopened.
-5. Check: databases load, cascading filters narrow, Submit draws series, single stat and table views, SQL tab, table context menu (supertable and child table), dark theme.
+5. Check: databases load, cascading filters narrow, Submit draws series, single stat and table views, SQL tab (Ctrl+Enter), raw mode, auto-refresh (pauses while zoomed, resumes after leaving the graph), saved queries, the language switch (zh-CN, pt-BR), table context menu (supertable, child table, and the refusal on another database type), dark theme.
 
 Screenshots in `docs/screenshots/` were captured this way at 1920×1080; refresh them when the UI changes visibly.
 
