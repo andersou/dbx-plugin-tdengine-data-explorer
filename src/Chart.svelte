@@ -32,6 +32,7 @@
     return () => {
       observer.disconnect();
       instance.dispose();
+      zoomed = false; // a chart that is gone (Table view, empty result) must not keep auto-refresh paused
     };
   });
 
