@@ -3,6 +3,7 @@
 // queryData returns at most 5000 rows (plugins/README.md, "Read-only data queries").
 export const MAX_ROWS = 5000;
 export const TAG_VALUES_LIMIT = 1000;
+export const MAX_SERIES = 100; // autoWindow keeps up to this many series under MAX_ROWS
 const TARGET_POINTS = 360; // points per series, the InfluxDB UI default
 
 export const FUNCTIONS = {
@@ -117,6 +118,9 @@ export function buildQuery(query, meta) {
   }
 
   const partition = groupBy ? column(groupBy) : "";
+  // The number input's min/max do not stop typing: empty, 1.5 or 6000 would break the SQL or the row cap.
+  if (partition && !(Number.isInteger(maxSeries) && maxSeries >= 1 && maxSeries <= MAX_SERIES))
+    fail("badMaxSeries", `Max series must be a whole number from 1 to ${MAX_SERIES}`, { max: MAX_SERIES });
   const interval = window === "auto" ? autoWindow(range.ms, partition ? maxSeries : 1) : window;
   const values = fields.flatMap((field) => fns.map((fn) => `${FUNCTIONS[fn](quoteIdent(field))} AS ${quoteIdent(`${fn}(${field})`)}`));
 

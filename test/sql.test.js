@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MAX_ROWS, RANGES, autoWindow, buildQuery, durationMs, filterClause, quoteIdent, quoteString, tagValuesQuery } from "../src/lib/sql.js";
+import { MAX_ROWS, MAX_SERIES, RANGES, autoWindow, buildQuery, durationMs, filterClause, quoteIdent, quoteString, tagValuesQuery } from "../src/lib/sql.js";
 
 const meta = { tsColumn: "ts", tagTypes: { location: "VARCHAR(24)", groupid: "INT" } };
 const query = {
@@ -52,12 +52,16 @@ test("absolute ranges use RFC 3339 literals", () => {
 
 test("auto window keeps every preset under the row cap", () => {
   for (const range of RANGES)
-    for (const series of [1, 8, 20, 50, 100]) {
+    for (const series of [1, 8, 20, 50, MAX_SERIES]) {
       const window = autoWindow(durationMs(range), series);
       const rows = (Math.ceil(durationMs(range) / durationMs(window)) + 1) * series;
       assert.ok(rows <= MAX_ROWS, `${range} x ${series} series -> ${window} = ${rows} rows`);
     }
   assert.equal(autoWindow(durationMs("1h")), "10s"); // 360 points, like the InfluxDB UI
+  // Past MAX_SERIES no window keeps the cap; empty or fractional values are not valid SLIMIT.
+  for (const maxSeries of [null, 0, 1.5, MAX_SERIES + 1]) assert.throws(() => buildQuery({ ...query, window: "auto", maxSeries }, meta), { code: "badMaxSeries" });
+  assert.match(buildQuery({ ...query, window: "auto", maxSeries: MAX_SERIES }, meta), new RegExp(`SLIMIT ${MAX_SERIES}$`));
+  assert.doesNotThrow(() => buildQuery({ ...query, groupBy: "", maxSeries: null }, meta));
 });
 
 test("literals and identifiers are escaped", () => {

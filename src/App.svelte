@@ -8,6 +8,7 @@
   import {
     FUNCTIONS,
     MAX_ROWS,
+    MAX_SERIES,
     RANGES,
     WINDOWS,
     autoWindow,
@@ -514,7 +515,7 @@
                 </select>
               </label>
               {#if query.groupBy}
-                <label><span class="dbx-label">{t("maxSeries")}</span><input class="dbx-input" type="number" min="1" max="100" bind:value={query.maxSeries} /></label>
+                <label><span class="dbx-label">{t("maxSeries")}</span><input class="dbx-input" type="number" min="1" max={MAX_SERIES} bind:value={query.maxSeries} /></label>
               {/if}
             {/if}
             <div class="functions" role="group" aria-label={t("functions")}>
