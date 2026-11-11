@@ -22,7 +22,7 @@ TDengine Data Explorer (`dbx-plugin-tdengine-data-explorer`): a frontend-only DB
 | `src/Chart.svelte` | ECharts wrapper: validated palette, DBX theme tokens, axis tooltip |
 | `test/` | `node:test` suites; `tdengine.test.js` runs generated SQL on a real TDengine |
 | `docs/` | Plugin system notes and README screenshots |
-| `.github/workflows/ci-release.yml`, `release.config.mjs`, `scripts/semantic-release.mjs` | CI, `.dbxp` packaging and semantic-release (same layout as `andersou/webdiffviewer`) |
+| `.github/workflows/ci-release.yml`, `release.config.mjs`, `scripts/semantic-release.mjs` | CI, `.dbxp` packaging and semantic-release (layout of `andersou/webdiffviewer`, without its metadata job and global npm install) |
 | `ui/`, `dist/` | Build output and packages (gitignored) |
 
 ## Commands
