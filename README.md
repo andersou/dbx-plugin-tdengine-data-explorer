@@ -39,7 +39,9 @@ Permissions: `host.data:read` (queries), `host.connections:read` (connection pic
 
 ## Install
 
-Download `io.github.andersou.tdengine-data-explorer-<version>-universal.dbxp` from the [latest release](https://github.com/andersou/dbx-plugin-tdengine-data-explorer/releases/latest) (or paste its URL into **Install from URL**). The package is not signed by the DBX Store yet: enable **Plugin Center → Settings → Allow unsigned development packages**, and on the web/Docker build also start DBX with `DBX_ALLOW_UNSIGNED_PLUGINS=1` (needed only while installing).
+Download `io.github.andersou.tdengine-data-explorer-<version>-universal.dbxp` from the [latest release](https://github.com/andersou/dbx-plugin-tdengine-data-explorer/releases/latest) and install it with **Plugin Center → Settings → Install .dbxp**. The desktop app can also take the asset URL in **Install from URL**; the web build fetches that URL from the browser, which GitHub release assets block (CORS), so upload the file there.
+
+The package is not signed by the DBX Store yet: enable **Allow unsigned development packages** in the same settings page, and on the web/Docker build also start DBX with `DBX_ALLOW_UNSIGNED_PLUGINS=1` (needed only while installing).
 
 ## Develop
 
