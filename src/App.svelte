@@ -283,29 +283,33 @@
   });
 
   async function readSaved() {
-    return (await host.storage.get(SAVED_KEY).catch(() => null)) ?? [];
+    return (await host.storage.get(SAVED_KEY)) ?? [];
   }
 
   async function loadSaved() {
-    if (host.capabilities?.storage) savedQueries = await readSaved();
+    if (host.capabilities?.storage) savedQueries = await readSaved().catch(() => savedQueries);
   }
 
-  async function writeSaved(list) {
-    await host.storage.set(SAVED_KEY, list).then(
-      () => (savedQueries = list),
-      (e) => (error = e.message),
-    );
+  // Re-reads first: another tab may have saved since this one loaded the list. A failed read writes nothing,
+  // so it can never replace the stored list with an empty one.
+  async function writeSaved(change) {
+    try {
+      const list = change(await readSaved());
+      await host.storage.set(SAVED_KEY, list);
+      savedQueries = list;
+    } catch (e) {
+      error = e.message;
+    }
   }
 
   // Saved queries leave the connection out, so they apply to whichever TDengine connection is open.
   async function saveQuery() {
     const { connectionId, ...saved } = $state.snapshot(query);
-    // Re-read first: another tab may have saved since this one loaded the list.
-    await writeSaved(upsertSaved(await readSaved(), savedName.trim(), saved));
+    await writeSaved((list) => upsertSaved(list, savedName.trim(), saved));
   }
 
   async function deleteQuery() {
-    await writeSaved(removeSaved(await readSaved(), savedName.trim()));
+    await writeSaved((list) => removeSaved(list, savedName.trim()));
     savedName = "";
   }
 
