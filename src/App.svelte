@@ -78,6 +78,7 @@
   let savedQueries = $state.raw([]);
   let savedName = $state("");
   let error = $state("");
+  let submitError = $state(""); // the last Submit or refresh tick failed; other errors leave the button alone
   let ready = $state(false);
   let reloadTick = $state(0);
   let dark = $state(false);
@@ -211,9 +212,9 @@
     try {
       sql = query.mode === "sql" ? query.sql.trim() : buildQuery(query, meta);
     } catch (e) {
-      return void (error = e.code ? t(e.code, e.vars) : e.message);
+      return void (error = submitError = e.code ? t(e.code, e.vars) : e.message);
     }
-    if (!sql) return void (error = t("writeSelect"));
+    if (!sql) return void (error = submitError = t("writeSelect"));
     const raw = query.mode === "builder" && query.window === "raw";
     // Raw rows split by tbname, a text column toSeries labels on its own.
     lastRun = { sql, raw, labels: query.mode === "builder" && !raw && query.groupBy ? [query.groupBy] : [], maxSeries: query.maxSeries, connectionId: query.connectionId };
@@ -221,14 +222,14 @@
   }
 
   async function execute({ sql, labels, connectionId }, quiet = false) {
-    error = "";
+    error = submitError = "";
     running = true;
     loading = !quiet;
     try {
       result = await run(sql, { connectionId });
       series = toSeries(result, { offset, labels });
     } catch (e) {
-      error = explain(e);
+      error = submitError = explain(e);
       refresh = ""; // a closed connection or a denied consent would fail on every tick
     } finally {
       running = loading = false;
@@ -396,7 +397,14 @@
       <option value="">{t("refreshOff")}</option>
       {#each REFRESH_INTERVALS as interval (interval)}<option value={interval}>{t("refreshEvery", { interval })}</option>{/each}
     </select>
-    <button class="dbx-btn dbx-btn--primary" type="button" disabled={running || !canQuery()} onclick={submit}>{t("submit")}</button>
+    <button
+      class="dbx-btn dbx-btn--primary"
+      class:failed={submitError}
+      type="button"
+      title={submitError || undefined}
+      aria-describedby={submitError ? "status" : undefined}
+      disabled={running || !canQuery()}
+      onclick={submit}>{t("submit")}</button>
   </header>
 
   <section class="result">
@@ -457,7 +465,7 @@
             onclick={deleteQuery}>✕</button>
         </div>
       {/if}
-      <span class="status" class:error role="status">
+      <span class="status" id="status" class:error role="status">
         {#if error}{error}{:else if loading}{t("running")}{:else if result}{t(result.rows.length === 1 ? "rowStatus" : "rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{seriesCapped ? ` · ${t("seriesCapped", { max: lastRun.maxSeries })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
       </span>
     </div>
@@ -660,6 +668,10 @@
   }
   .saved .dbx-btn {
     height: 28px;
+  }
+  /* The error itself is in the status line and the tooltip; the ring points to it from the button. */
+  .failed {
+    box-shadow: 0 0 0 2px var(--color-destructive, #d03b3b);
   }
   .status {
     margin-left: auto;
