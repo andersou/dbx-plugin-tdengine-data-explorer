@@ -100,20 +100,29 @@ export function buildQuery(query, meta) {
   if (!database || !table) fail("pickTable", "Choose a database and a table");
   if (!meta.tsColumn) fail("noTimestamp", `${table} has no timestamp column`, { table });
   if (!fields.length) fail("pickField", "Choose at least one field");
-  if (!fns.length) fail("pickFunction", "Choose at least one aggregate function");
+  if (window !== "raw" && !fns.length) fail("pickFunction", "Choose at least one aggregate function");
 
   const range = timeRange(query.range);
+  const ts = quoteIdent(meta.tsColumn);
+  const from = `FROM ${quoteIdent(database)}.${quoteIdent(table)}`;
+  const where = `WHERE ${[`${ts} >= ${range.lower}`, `${ts} < ${range.upper}`, ...filterClauses(filters, meta.tagTypes)].join("\n  AND ")}`;
+
+  // Under ORDER BY, TDengine merges PARTITION BY output into one sorted stream, so no single query returns
+  // the latest N rows of every series: raw mode takes the latest MAX_ROWS overall, one series per child table.
+  if (window === "raw") {
+    const columns = [`TO_ISO8601(${ts}, 'Z') AS _time`, ...(meta.isSuper ? ["tbname"] : []), ...fields.map(quoteIdent)];
+    return [`SELECT ${columns.join(", ")}`, from, where, `ORDER BY ${ts} DESC`, `LIMIT ${MAX_ROWS}`].join("\n");
+  }
+
   const partition = groupBy ? column(groupBy) : "";
   const interval = window === "auto" ? autoWindow(range.ms, partition ? maxSeries : 1) : window;
-  const ts = quoteIdent(meta.tsColumn);
   const values = fields.flatMap((field) => fns.map((fn) => `${FUNCTIONS[fn](quoteIdent(field))} AS ${quoteIdent(`${fn}(${field})`)}`));
-  const where = [`${ts} >= ${range.lower}`, `${ts} < ${range.upper}`, ...filterClauses(filters, meta.tagTypes)];
 
   return [
     // The agent renders TIMESTAMP without an offset; an explicit UTC string keeps the chart exact.
     `SELECT TO_ISO8601(_wstart, 'Z') AS _time, ${partition ? `${partition}, ` : ""}${values.join(", ")}`,
-    `FROM ${quoteIdent(database)}.${quoteIdent(table)}`,
-    `WHERE ${where.join("\n  AND ")}`,
+    from,
+    where,
     partition && `PARTITION BY ${partition}`,
     `INTERVAL(${interval})${FILLS[fill](values.length)}`,
     partition && `SLIMIT ${maxSeries}`,

@@ -40,4 +40,9 @@ test("generated SQL runs on TDengine", { skip: !url && "set TDENGINE_URL" }, asy
   for (const fill of Object.keys(FILLS)) await run(buildQuery({ ...base, fill }, { tsColumn: "ts", tagTypes }));
   for (const groupBy of ["", "location", "groupid"]) await run(buildQuery({ ...base, groupBy }, { tsColumn: "ts", tagTypes }));
   await run(buildQuery({ ...base, range: { type: "relative", value: "7d" } }, { tsColumn: "ts", tagTypes }));
+
+  const raw = await run(buildQuery({ ...base, window: "raw", fns: [] }, { tsColumn: "ts", tagTypes, isSuper: true }));
+  const times = raw.rows.map(([time]) => Date.parse(time));
+  assert.ok(raw.rows.length > 0 && times.every((time, index) => index === 0 || time <= times[index - 1]), "raw rows come newest first");
+  assert.ok(toSeries(raw).every((s) => s.data.every(([, value]) => typeof value === "number")));
 });

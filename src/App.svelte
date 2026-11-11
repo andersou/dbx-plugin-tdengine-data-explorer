@@ -71,7 +71,7 @@
   let loading = $state(false); // a run the user started; auto-refresh ticks keep the frame undimmed
   let refresh = $state(""); // not part of query: a restored tab must never start querying on its own
   let zoomed = $state(false);
-  let lastRun = null;
+  let lastRun = $state.raw(null);
   let error = $state("");
   let ready = $state(false);
   let reloadTick = $state(0);
@@ -201,7 +201,9 @@
       return void (error = e.code ? t(e.code, e.vars) : e.message);
     }
     if (!sql) return void (error = t("writeSelect"));
-    lastRun = { sql, labels: query.mode === "builder" && query.groupBy ? [query.groupBy] : [], connectionId: query.connectionId };
+    const raw = query.mode === "builder" && query.window === "raw";
+    // Raw rows split by tbname, a text column toSeries labels on its own.
+    lastRun = { sql, raw, labels: query.mode === "builder" && !raw && query.groupBy ? [query.groupBy] : [], connectionId: query.connectionId };
     execute(lastRun);
   }
 
@@ -378,7 +380,7 @@
       <button class="tab" class:active={query.mode === "builder"} role="tab" aria-selected={query.mode === "builder"} type="button" onclick={() => setMode("builder")}>{t("queryBuilder")}</button>
       <button class="tab" class:active={query.mode === "sql"} role="tab" aria-selected={query.mode === "sql"} type="button" onclick={() => setMode("sql")}>{t("sqlTab")}</button>
       <span class="status" class:error role="status">
-        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
+        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
       </span>
     </div>
 
@@ -421,30 +423,35 @@
           <label><span class="dbx-label">{t("window")}</span>
             <select class="dbx-select" bind:value={query.window}>
               <option value="auto">{t("auto", { window: autoLabel })}</option>
+              <option value="raw">{t("raw")}</option>
               {#each WINDOWS as window (window)}<option value={window}>{window}</option>{/each}
             </select>
           </label>
-          <label><span class="dbx-label">{t("fill")}</span>
-            <select class="dbx-select" bind:value={query.fill}>
-              {#each Object.entries(FILL_KEYS) as [value, key] (value)}<option {value}>{t(key)}</option>{/each}
-            </select>
-          </label>
-          {#if tagKeys.length}
-            <label><span class="dbx-label">{t("seriesLabel")}</span>
-              <select class="dbx-select" bind:value={query.groupBy}>
-                <option value="">{t("mergeAll")}</option>
-                {#each tagKeys as key (key)}<option value={key}>{t("perKey", { key })}</option>{/each}
+          {#if query.window === "raw"}
+            <p class="dbx-hint">{t("rawHint", { max: MAX_ROWS })}</p>
+          {:else}
+            <label><span class="dbx-label">{t("fill")}</span>
+              <select class="dbx-select" bind:value={query.fill}>
+                {#each Object.entries(FILL_KEYS) as [value, key] (value)}<option {value}>{t(key)}</option>{/each}
               </select>
             </label>
-            {#if query.groupBy}
-              <label><span class="dbx-label">{t("maxSeries")}</span><input class="dbx-input" type="number" min="1" max="100" bind:value={query.maxSeries} /></label>
+            {#if tagKeys.length}
+              <label><span class="dbx-label">{t("seriesLabel")}</span>
+                <select class="dbx-select" bind:value={query.groupBy}>
+                  <option value="">{t("mergeAll")}</option>
+                  {#each tagKeys as key (key)}<option value={key}>{t("perKey", { key })}</option>{/each}
+                </select>
+              </label>
+              {#if query.groupBy}
+                <label><span class="dbx-label">{t("maxSeries")}</span><input class="dbx-input" type="number" min="1" max="100" bind:value={query.maxSeries} /></label>
+              {/if}
             {/if}
+            <div class="functions" role="group" aria-label={t("functions")}>
+              {#each FN_ITEMS as { value, label } (value)}
+                <label title={FUNCTIONS[value]("x")}><input type="checkbox" bind:group={query.fns} {value} /> {label}</label>
+              {/each}
+            </div>
           {/if}
-          <div class="functions" role="group" aria-label={t("functions")}>
-            {#each FN_ITEMS as { value, label } (value)}
-              <label title={FUNCTIONS[value]("x")}><input type="checkbox" bind:group={query.fns} {value} /> {label}</label>
-            {/each}
-          </div>
         </section>
       </div>
     {:else}

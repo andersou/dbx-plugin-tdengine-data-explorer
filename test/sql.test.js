@@ -74,3 +74,21 @@ test("tag values cascade from earlier filters", () => {
     "SELECT DISTINCT tbname FROM `power`.`meters` WHERE `groupid` IN (3) LIMIT 1000",
   );
 });
+
+test("raw mode reads the latest rows, one series per child table", () => {
+  const filters = [{ key: "location", values: ["California.SanFrancisco"] }];
+  assert.equal(
+    buildQuery({ ...query, window: "raw", fns: [], fields: ["current", "voltage"], filters }, { ...meta, isSuper: true }),
+    [
+      "SELECT TO_ISO8601(`ts`, 'Z') AS _time, tbname, `current`, `voltage`",
+      "FROM `power`.`meters`",
+      "WHERE `ts` >= NOW - 1h",
+      "  AND `ts` < NOW",
+      "  AND `location` IN ('California.SanFrancisco')",
+      "ORDER BY `ts` DESC",
+      `LIMIT ${MAX_ROWS}`,
+    ].join("\n"),
+  );
+  // A normal table has no tbname series split.
+  assert.match(buildQuery({ ...query, window: "raw", table: "nt1" }, meta), /^SELECT TO_ISO8601\(`ts`, 'Z'\) AS _time, `current`\n/);
+});
