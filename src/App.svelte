@@ -177,9 +177,10 @@
     if (query.groupBy && !tagKeys.includes(query.groupBy)) query.groupBy = tagKeys.length ? "tbname" : "";
   }
 
-  function fetchTagValues(key, upstream, isStale) {
-    const sql = tagValuesQuery({ database: query.database, table: query.table, key, filters: upstream, tagTypes: meta.tagTypes });
+  // async: a value literal() refuses (the agent sends NaN and inf as strings) rejects into the card instead of throwing in its effect.
+  async function fetchTagValues(key, upstream, isStale) {
     void reloadTick;
+    const sql = tagValuesQuery({ database: query.database, table: query.table, key, filters: upstream, tagTypes: meta.tagTypes });
     return run(sql, { isStale }).then(({ rows }) =>
       rows.map(([value]) => value).sort((a, b) => (a === null) - (b === null) || String(a).localeCompare(String(b), undefined, { numeric: true })),
     );
