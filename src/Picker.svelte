@@ -1,6 +1,6 @@
 <script>
   // Searchable single/multi-select list used by every builder card.
-  let { items = [], selected = [], multiple = false, loading = false, error = "", note = "", label, onchange } = $props();
+  let { t, items = [], selected = [], multiple = false, loading = false, error = "", note = "", label, onchange } = $props();
   let search = $state("");
   const visible = $derived(items.filter((item) => item.label.toLowerCase().includes(search.trim().toLowerCase())));
 
@@ -10,7 +10,7 @@
   }
 </script>
 
-<input class="dbx-input search" type="search" placeholder="Search" aria-label={`Search ${label}`} bind:value={search} />
+<input class="dbx-input search" type="search" placeholder={t("search")} aria-label={t("searchIn", { label })} bind:value={search} />
 <div class="list" class:loading role="group" aria-label={label}>
   {#each visible as item (item.value)}
     <label class="item">
@@ -19,7 +19,7 @@
       {#if item.hint}<span class="hint">{item.hint}</span>{/if}
     </label>
   {:else}
-    <p class="dbx-hint">{loading ? "Loading…" : error || "Nothing to show"}</p>
+    <p class="dbx-hint">{loading ? t("loading") : error || t("nothing")}</p>
   {/each}
 </div>
 {#if error && visible.length}<p class="dbx-hint error">{error}</p>{/if}

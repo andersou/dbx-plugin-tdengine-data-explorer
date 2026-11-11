@@ -2,6 +2,7 @@
   import Chart from "./Chart.svelte";
   import FilterCard from "./FilterCard.svelte";
   import Picker from "./Picker.svelte";
+  import { translate } from "./lib/i18n.js";
   import { lastValue, parseOffset, toSeries } from "./lib/series.js";
   import {
     FUNCTIONS,
@@ -24,17 +25,17 @@
 
   const host = window.dbxPlugin;
   const VIEWS = [
-    ["graph", "Graph"],
-    ["stat", "Single stat"],
-    ["table", "Table"],
+    ["graph", "graph"],
+    ["stat", "stat"],
+    ["table", "viewTable"],
   ];
   const KINDS = [
-    ["line", "Line"],
-    ["step", "Step"],
-    ["points", "Points"],
+    ["line", "line"],
+    ["step", "step"],
+    ["points", "points"],
   ];
   const REFRESH_INTERVALS = ["10s", "30s", "1m", "5m"];
-  const FILL_LABELS = { none: "none", null: "null (gaps)", prev: "previous", linear: "linear", zero: "zero" };
+  const FILL_KEYS = { none: "fillNone", null: "fillNull", prev: "fillPrev", linear: "fillLinear", zero: "fillZero" };
   const FN_ITEMS = Object.keys(FUNCTIONS).map((fn) => ({ value: fn, label: { avg: "mean", median: "median ≈" }[fn] ?? fn }));
   const DEFAULT_QUERY = {
     connectionId: "",
@@ -58,7 +59,6 @@
   const MAX_STATES = 20;
   const newId = () => Math.random().toString(36).slice(2);
   const toLocalInput = (ms) => new Date(ms - new Date(ms).getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
-  const numberFormat = new Intl.NumberFormat(host.locale, { maximumFractionDigits: 3 });
 
   let query = $state(structuredClone(DEFAULT_QUERY));
   let allConnections = $state([]);
@@ -77,12 +77,15 @@
   let reloadTick = $state(0);
   let dark = $state(false);
   let themeTick = $state(0);
+  let locale = $state(host.locale);
   let offset = "+00:00";
   let stateKey = "default";
 
   const connections = $derived(allConnections.filter((connection) => connection.dbType === "tdengine"));
   const current = $derived(allConnections.find((connection) => connection.id === query.connectionId));
   const unsupported = $derived(current && current.dbType !== "tdengine");
+  const t = (key, vars) => translate(locale, key, vars);
+  const numberFormat = $derived(new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }));
   const tagKeys = $derived(meta.isSuper ? ["tbname", ...meta.tags.map((tag) => tag.name)] : []);
   const builderSql = $derived.by(() => {
     try {
@@ -109,7 +112,7 @@
 
   function explain(e) {
     const message = String(e?.message ?? e);
-    return /not open/i.test(message) ? "This connection is closed. Connect to it in DBX, then press ⟳." : message;
+    return /not open/i.test(message) ? t("connectionClosed") : message;
   }
 
   // Applies a load result unless a newer run of the same effect replaced it.
@@ -194,10 +197,10 @@
     let sql;
     try {
       sql = query.mode === "sql" ? query.sql.trim() : buildQuery(query, meta);
-      if (!sql) throw new Error("Write a SELECT statement first");
     } catch (e) {
-      return void (error = e.message);
+      return void (error = e.code ? t(e.code, e.vars) : e.message);
     }
+    if (!sql) return void (error = t("writeSelect"));
     lastRun = { sql, labels: query.mode === "builder" && query.groupBy ? [query.groupBy] : [], connectionId: query.connectionId };
     execute(lastRun);
   }
@@ -269,7 +272,12 @@
     return () => clearTimeout(timer);
   });
 
+  $effect(() => {
+    document.documentElement.lang = locale;
+  });
+
   host.ready.then(async (context) => {
+    locale = host.locale;
     dark = host.theme?.appearance === "dark";
     stateKey = context?.workbenchId ?? context?.connectionId ?? "default";
     const saved = host.capabilities?.storage ? await host.storage.get(`state:${stateKey}`).catch(() => null) : null;
@@ -281,6 +289,7 @@
   });
   host.onContext(applyContext);
   document.addEventListener("dbx-plugin-env", () => {
+    locale = host.locale;
     dark = host.theme?.appearance === "dark";
     themeTick++;
   });
@@ -292,7 +301,7 @@
   <header class="toolbar">
     <select
       class="dbx-select"
-      aria-label="Connection"
+      aria-label={t("connection")}
       value={query.connectionId}
       onfocus={refreshConnections}
       onchange={(e) => {
@@ -300,44 +309,44 @@
         Object.assign(query, { connectionId: e.currentTarget.value, database: "", table: "", fields: [], filters: [] });
       }}
     >
-      <option value="" disabled>{connections.length ? "Choose a TDengine connection" : "No TDengine connection in DBX"}</option>
+      <option value="" disabled>{connections.length ? t("chooseConnection") : t("noConnections")}</option>
       {#each connections as connection (connection.id)}
-        <option value={connection.id}>{connection.name}{connection.connected ? "" : " (not connected)"}</option>
+        <option value={connection.id}>{connection.connected ? connection.name : t("notConnected", { name: connection.name })}</option>
       {/each}
       {#if query.connectionId && !connections.some((connection) => connection.id === query.connectionId)}
-        <option value={query.connectionId}>{current?.name ?? "Current connection"}</option>
+        <option value={query.connectionId}>{current?.name ?? t("currentConnection")}</option>
       {/if}
     </select>
-    <button class="dbx-btn dbx-btn--ghost" type="button" title="Reload connections and metadata" aria-label="Reload" onclick={reload}>⟳</button>
+    <button class="dbx-btn dbx-btn--ghost" type="button" title={t("reload")} aria-label={t("reload")} onclick={reload}>⟳</button>
     <span class="spacer"></span>
-    <div class="segmented" role="group" aria-label="View">
-      {#each VIEWS as [value, label] (value)}
-        <button class="dbx-btn" class:dbx-btn--primary={query.view === value} type="button" aria-pressed={query.view === value} onclick={() => (query.view = value)}>{label}</button>
+    <div class="segmented" role="group" aria-label={t("view")}>
+      {#each VIEWS as [value, key] (value)}
+        <button class="dbx-btn" class:dbx-btn--primary={query.view === value} type="button" aria-pressed={query.view === value} onclick={() => (query.view = value)}>{t(key)}</button>
       {/each}
     </div>
     {#if query.view === "graph"}
-      <select class="dbx-select" aria-label="Graph type" bind:value={query.kind}>
-        {#each KINDS as [value, label] (value)}<option {value}>{label}</option>{/each}
+      <select class="dbx-select" aria-label={t("graphType")} bind:value={query.kind}>
+        {#each KINDS as [value, key] (value)}<option {value}>{t(key)}</option>{/each}
       </select>
     {/if}
-    <select class="dbx-select" aria-label="Time range" value={query.range.type === "relative" ? query.range.value : "custom"} onchange={(e) => setRange(e.currentTarget.value)}>
-      {#each RANGES as range (range)}<option value={range}>Past {range}</option>{/each}
-      <option value="custom">Custom range…</option>
+    <select class="dbx-select" aria-label={t("timeRange")} value={query.range.type === "relative" ? query.range.value : "custom"} onchange={(e) => setRange(e.currentTarget.value)}>
+      {#each RANGES as range (range)}<option value={range}>{t("past", { range })}</option>{/each}
+      <option value="custom">{t("customRange")}</option>
     </select>
     {#if query.range.type === "absolute"}
-      <input class="dbx-input" type="datetime-local" aria-label="Start" bind:value={query.range.start} />
-      <input class="dbx-input" type="datetime-local" aria-label="Stop" bind:value={query.range.stop} />
+      <input class="dbx-input" type="datetime-local" aria-label={t("start")} bind:value={query.range.start} />
+      <input class="dbx-input" type="datetime-local" aria-label={t("stop")} bind:value={query.range.stop} />
     {/if}
-    <select class="dbx-select" aria-label="Auto-refresh" bind:value={refresh} disabled={query.range.type !== "relative"}>
-      <option value="">Auto-refresh off</option>
-      {#each REFRESH_INTERVALS as interval (interval)}<option value={interval}>Every {interval}</option>{/each}
+    <select class="dbx-select" aria-label={t("autoRefresh")} bind:value={refresh} disabled={query.range.type !== "relative"}>
+      <option value="">{t("refreshOff")}</option>
+      {#each REFRESH_INTERVALS as interval (interval)}<option value={interval}>{t("refreshEvery", { interval })}</option>{/each}
     </select>
-    <button class="dbx-btn dbx-btn--primary" type="button" disabled={running || !query.connectionId || unsupported} onclick={submit}>Submit</button>
+    <button class="dbx-btn dbx-btn--primary" type="button" disabled={running || !query.connectionId || unsupported} onclick={submit}>{t("submit")}</button>
   </header>
 
   <section class="result">
     {#if unsupported}
-      <p class="empty dbx-hint">This builder reads TDengine connections only; {current.name} is {current.dbType}.</p>
+      <p class="empty dbx-hint">{t("unsupported", { name: current.name, dbType: current.dbType })}</p>
     {:else if query.view === "table" && result}
       <div class="table-wrap">
         <table class="dbx-table">
@@ -348,28 +357,28 @@
             {/each}
           </tbody>
         </table>
-        {#if result.rows.length > 1000}<p class="dbx-hint">Showing 1000 of {result.rows.length} rows.</p>{/if}
+        {#if result.rows.length > 1000}<p class="dbx-hint">{t("showingRows", { shown: 1000, total: result.rows.length })}</p>{/if}
       </div>
     {:else if query.view === "stat" && series.length}
       <div class="stat" class:dim={loading}>
         <strong>{lastValue(series[0]) === null ? "—" : numberFormat.format(lastValue(series[0]))}</strong>
-        <span class="dbx-hint">{series[0].name}{series.length > 1 ? ` · first of ${series.length} series` : ""}</span>
+        <span class="dbx-hint">{series[0].name}{series.length > 1 ? ` · ${t("firstOfSeries", { n: series.length })}` : ""}</span>
       </div>
     {:else if series.length}
-      <Chart {series} kind={query.kind} {dark} {themeTick} {loading} bind:zoomed />
+      <Chart {series} kind={query.kind} {dark} {themeTick} {loading} {locale} {t} bind:zoomed />
     {:else}
       <p class="empty dbx-hint">
-        {loading ? "Running…" : result ? (result.rows.length ? "The result has no time column; open the Table view." : "No data in this time range.") : "Build a query below, then press Submit."}
+        {loading ? t("running") : result ? (result.rows.length ? t("noTimeColumn") : t("noData")) : t("buildHint")}
       </p>
     {/if}
   </section>
 
   <footer class="builder">
     <div class="tabs" role="tablist">
-      <button class="tab" class:active={query.mode === "builder"} role="tab" aria-selected={query.mode === "builder"} type="button" onclick={() => setMode("builder")}>Query Builder</button>
-      <button class="tab" class:active={query.mode === "sql"} role="tab" aria-selected={query.mode === "sql"} type="button" onclick={() => setMode("sql")}>SQL</button>
+      <button class="tab" class:active={query.mode === "builder"} role="tab" aria-selected={query.mode === "builder"} type="button" onclick={() => setMode("builder")}>{t("queryBuilder")}</button>
+      <button class="tab" class:active={query.mode === "sql"} role="tab" aria-selected={query.mode === "sql"} type="button" onclick={() => setMode("sql")}>{t("sqlTab")}</button>
       <span class="status" class:error role="status">
-        {#if error}{error}{:else if loading}Running…{:else if result}{result.rows.length} rows · {result.elapsedMs} ms{result.truncated ? ` · truncated at ${MAX_ROWS} rows: shorten the range or widen the window` : ""}{refresh ? (zoomed ? " · auto-refresh paused while zoomed" : ` · refreshing every ${refresh}`) : ""}{/if}
+        {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
       </span>
     </div>
 
@@ -377,59 +386,61 @@
       <div class="builder-body">
         <div class="cards">
           <section class="dbx-card card">
-            <h3 class="dbx-section-title">Database</h3>
+            <h3 class="dbx-section-title">{t("database")}</h3>
             <Picker
-              label="Database"
+              {t}
+              label={t("database")}
               items={databases.map((name) => ({ value: name, label: name }))}
               selected={[query.database]}
               onchange={([database]) => database !== query.database && Object.assign(query, { database, table: "", fields: [], filters: [] })}
             />
           </section>
           <section class="dbx-card card">
-            <h3 class="dbx-section-title">Table</h3>
+            <h3 class="dbx-section-title">{t("cardTable")}</h3>
             <Picker
-              label="Table"
+              {t}
+              label={t("cardTable")}
               items={tables.map(({ name, kind }) => ({ value: name, label: name, hint: kind }))}
               selected={[query.table]}
               onchange={([table]) => table !== query.table && Object.assign(query, { table, fields: [], filters: [] })}
             />
           </section>
           <section class="dbx-card card">
-            <h3 class="dbx-section-title">Fields</h3>
-            <Picker multiple label="Fields" items={meta.fields.map(({ name, type }) => ({ value: name, label: name, hint: type }))} selected={query.fields} onchange={(fields) => (query.fields = fields)} />
+            <h3 class="dbx-section-title">{t("fields")}</h3>
+            <Picker multiple {t} label={t("fields")} items={meta.fields.map(({ name, type }) => ({ value: name, label: name, hint: type }))} selected={query.fields} onchange={(fields) => (query.fields = fields)} />
           </section>
           {#each query.filters as filter, index (filter.id)}
-            <FilterCard keys={tagKeys} bind:filter={query.filters[index]} upstream={query.filters.slice(0, index)} fetchValues={fetchTagValues} onremove={() => query.filters.splice(index, 1)} />
+            <FilterCard {t} keys={tagKeys} bind:filter={query.filters[index]} upstream={query.filters.slice(0, index)} fetchValues={fetchTagValues} onremove={() => query.filters.splice(index, 1)} />
           {/each}
           {#if tagKeys.length}
-            <button class="dbx-card card add" type="button" onclick={addFilter}>+ Filter</button>
+            <button class="dbx-card card add" type="button" onclick={addFilter}>{t("addFilter")}</button>
           {/if}
         </div>
         <section class="dbx-card card aggregate">
-          <h3 class="dbx-section-title">Aggregate</h3>
-          <label><span class="dbx-label">Window</span>
+          <h3 class="dbx-section-title">{t("aggregate")}</h3>
+          <label><span class="dbx-label">{t("window")}</span>
             <select class="dbx-select" bind:value={query.window}>
-              <option value="auto">auto ({autoLabel})</option>
+              <option value="auto">{t("auto", { window: autoLabel })}</option>
               {#each WINDOWS as window (window)}<option value={window}>{window}</option>{/each}
             </select>
           </label>
-          <label><span class="dbx-label">Fill</span>
+          <label><span class="dbx-label">{t("fill")}</span>
             <select class="dbx-select" bind:value={query.fill}>
-              {#each Object.entries(FILL_LABELS) as [value, label] (value)}<option {value}>{label}</option>{/each}
+              {#each Object.entries(FILL_KEYS) as [value, key] (value)}<option {value}>{t(key)}</option>{/each}
             </select>
           </label>
           {#if tagKeys.length}
-            <label><span class="dbx-label">Series</span>
+            <label><span class="dbx-label">{t("seriesLabel")}</span>
               <select class="dbx-select" bind:value={query.groupBy}>
-                <option value="">one (merge all)</option>
-                {#each tagKeys as key (key)}<option value={key}>per {key}</option>{/each}
+                <option value="">{t("mergeAll")}</option>
+                {#each tagKeys as key (key)}<option value={key}>{t("perKey", { key })}</option>{/each}
               </select>
             </label>
             {#if query.groupBy}
-              <label><span class="dbx-label">Max series</span><input class="dbx-input" type="number" min="1" max="100" bind:value={query.maxSeries} /></label>
+              <label><span class="dbx-label">{t("maxSeries")}</span><input class="dbx-input" type="number" min="1" max="100" bind:value={query.maxSeries} /></label>
             {/if}
           {/if}
-          <div class="functions" role="group" aria-label="Functions">
+          <div class="functions" role="group" aria-label={t("functions")}>
             {#each FN_ITEMS as { value, label } (value)}
               <label title={FUNCTIONS[value]("x")}><input type="checkbox" bind:group={query.fns} {value} /> {label}</label>
             {/each}
@@ -440,14 +451,14 @@
       <div class="sql">
         <textarea
           class="dbx-textarea"
-          aria-label="SQL"
+          aria-label={t("sqlTab")}
           spellcheck="false"
           bind:value={query.sql}
           onkeydown={(e) => (e.ctrlKey || e.metaKey) && e.key === "Enter" && submit()}
         ></textarea>
         <p class="dbx-hint">
-          One read-only statement; Ctrl+Enter runs it. Charts use the first timestamp column, text columns name the series.
-          <button class="dbx-link" type="button" disabled={!builderSql} onclick={() => (query.sql = generatedSql = builderSql)}>Copy the builder query</button>
+          {t("sqlHint")}
+          <button class="dbx-link" type="button" disabled={!builderSql} onclick={() => (query.sql = generatedSql = builderSql)}>{t("copyBuilder")}</button>
         </p>
       </div>
     {/if}

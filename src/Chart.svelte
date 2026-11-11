@@ -13,10 +13,9 @@
     dark: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"],
   };
   const OTHER = "#898781";
-  const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 3 });
 
   // themeTick changes on every DBX theme push, including palette swaps that keep the appearance.
-  let { series, kind = "line", dark = false, themeTick = 0, loading = false, zoomed = $bindable(false) } = $props();
+  let { series, kind = "line", dark = false, themeTick = 0, loading = false, locale, t, zoomed = $bindable(false) } = $props();
   let element;
   let chart = $state();
 
@@ -46,6 +45,7 @@
     const line = token("--color-border", dark ? "#383835" : "#e1e0d9");
     const surface = token("--color-card", dark ? "#26292e" : "#ffffff");
     const palette = dark ? PALETTE.dark : PALETTE.light;
+    const numberFormat = new Intl.NumberFormat(locale, { maximumFractionDigits: 3 });
     chart.setOption(
       {
         animation: false,
@@ -82,7 +82,7 @@
   });
 </script>
 
-<div class="chart" class:loading bind:this={element} role="img" aria-label="Time series chart; the Table view lists every value"></div>
+<div class="chart" class:loading bind:this={element} role="img" aria-label={t("chartLabel")}></div>
 
 <style>
   .chart {

@@ -3,7 +3,7 @@
   import { TAG_VALUES_LIMIT } from "./lib/sql.js";
 
   // One InfluxDB-style filter card: a tag key and its values, narrowed by the cards before it.
-  let { keys, filter = $bindable(), upstream, fetchValues, onremove } = $props();
+  let { t, keys, filter = $bindable(), upstream, fetchValues, onremove } = $props();
   let items = $state([]);
   let loading = $state(false);
   let error = $state("");
@@ -30,21 +30,22 @@
 
 <section class="dbx-card card">
   <div class="head">
-    <select class="dbx-select" aria-label="Filter tag" bind:value={filter.key} onchange={() => (filter.values = [])}>
-      <option value="" disabled>Choose a tag</option>
+    <select class="dbx-select" aria-label={t("filterTag")} bind:value={filter.key} onchange={() => (filter.values = [])}>
+      <option value="" disabled>{t("chooseTag")}</option>
       {#each keys as key (key)}<option value={key}>{key}</option>{/each}
     </select>
-    <button class="dbx-btn dbx-btn--ghost" type="button" aria-label="Remove filter" title="Remove filter" onclick={onremove}>✕</button>
+    <button class="dbx-btn dbx-btn--ghost" type="button" aria-label={t("removeFilter")} title={t("removeFilter")} onclick={onremove}>✕</button>
   </div>
   <Picker
     multiple
-    label={filter.key || "tag values"}
+    {t}
+    label={filter.key || t("tagValues")}
     {items}
     {loading}
     {error}
     selected={filter.values}
     onchange={(values) => (filter.values = values)}
-    note={items.length >= TAG_VALUES_LIMIT ? `First ${TAG_VALUES_LIMIT} values; narrow the cards on the left` : ""}
+    note={items.length >= TAG_VALUES_LIMIT ? t("firstValues", { n: TAG_VALUES_LIMIT }) : ""}
   />
 </section>
 

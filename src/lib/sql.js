@@ -32,6 +32,11 @@ export const WINDOWS = ["1s", "5s", "10s", "15s", "30s", "1m", "2m", "5m", "10m"
 
 const UNIT_MS = { s: 1e3, m: 60e3, h: 3600e3, d: 86400e3 };
 
+// User-facing validation errors carry a code the UI translates.
+function fail(code, message, vars) {
+  throw Object.assign(new Error(message), { code, vars });
+}
+
 export function durationMs(duration) {
   const match = /^(\d+)([smhd])$/.exec(duration);
   if (!match) throw new Error(`Invalid duration: ${duration}`);
@@ -78,7 +83,7 @@ export function timeRange(range) {
   if (range.type === "absolute") {
     const start = new Date(range.start);
     const stop = new Date(range.stop);
-    if (!(stop > start)) throw new Error("The time range must end after it starts");
+    if (!(stop > start)) fail("badRange", "The time range must end after it starts");
     return { lower: quoteString(start.toISOString()), upper: quoteString(stop.toISOString()), ms: stop - start };
   }
   return { lower: `NOW - ${range.value}`, upper: "NOW", ms: durationMs(range.value) };
@@ -92,10 +97,10 @@ export function autoWindow(rangeMs, seriesCap = 1) {
 
 export function buildQuery(query, meta) {
   const { database, table, fields, fns, filters, groupBy, fill, window, maxSeries } = query;
-  if (!database || !table) throw new Error("Choose a database and a table");
-  if (!meta.tsColumn) throw new Error(`${table} has no timestamp column`);
-  if (!fields.length) throw new Error("Choose at least one field");
-  if (!fns.length) throw new Error("Choose at least one aggregate function");
+  if (!database || !table) fail("pickTable", "Choose a database and a table");
+  if (!meta.tsColumn) fail("noTimestamp", `${table} has no timestamp column`, { table });
+  if (!fields.length) fail("pickField", "Choose at least one field");
+  if (!fns.length) fail("pickFunction", "Choose at least one aggregate function");
 
   const range = timeRange(query.range);
   const partition = groupBy ? column(groupBy) : "";
