@@ -3,6 +3,7 @@
   import FilterCard from "./FilterCard.svelte";
   import Picker from "./Picker.svelte";
   import { translate } from "./lib/i18n.js";
+  import { removeSaved, upsertSaved } from "./lib/saved.js";
   import { lastValue, parseOffset, toSeries } from "./lib/series.js";
   import {
     FUNCTIONS,
@@ -57,6 +58,7 @@
   };
   const EMPTY_META = { tsColumn: "", fields: [], tags: [], tagTypes: {}, isSuper: false };
   const MAX_STATES = 20;
+  const SAVED_KEY = "saved";
   const newId = () => Math.random().toString(36).slice(2);
   const toLocalInput = (ms) => new Date(ms - new Date(ms).getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
 
@@ -72,6 +74,8 @@
   let refresh = $state(""); // not part of query: a restored tab must never start querying on its own
   let zoomed = $state(false);
   let lastRun = $state.raw(null);
+  let savedQueries = $state.raw([]);
+  let savedName = $state("");
   let error = $state("");
   let ready = $state(false);
   let reloadTick = $state(0);
@@ -274,6 +278,42 @@
     return () => clearTimeout(timer);
   });
 
+  async function readSaved() {
+    return (await host.storage.get(SAVED_KEY).catch(() => null)) ?? [];
+  }
+
+  async function loadSaved() {
+    if (host.capabilities?.storage) savedQueries = await readSaved();
+  }
+
+  async function writeSaved(list) {
+    await host.storage.set(SAVED_KEY, list).then(
+      () => (savedQueries = list),
+      (e) => (error = e.message),
+    );
+  }
+
+  // Saved queries leave the connection out, so they apply to whichever TDengine connection is open.
+  async function saveQuery() {
+    const { connectionId, ...saved } = $state.snapshot(query);
+    // Re-read first: another tab may have saved since this one loaded the list.
+    await writeSaved(upsertSaved(await readSaved(), savedName.trim(), saved));
+  }
+
+  async function deleteQuery() {
+    await writeSaved(removeSaved(await readSaved(), savedName.trim()));
+    savedName = "";
+  }
+
+  // Loading never runs the query; the metadata effects re-check its fields and filters on this connection.
+  function loadQuery(name) {
+    const entry = savedQueries.find((saved) => saved.name === name);
+    if (!entry) return;
+    savedName = name;
+    refresh = "";
+    query = { ...structuredClone(DEFAULT_QUERY), ...structuredClone(entry.query), connectionId: query.connectionId };
+  }
+
   $effect(() => {
     document.documentElement.lang = locale;
   });
@@ -284,7 +324,7 @@
     stateKey = context?.workbenchId ?? context?.connectionId ?? "default";
     const saved = host.capabilities?.storage ? await host.storage.get(`state:${stateKey}`).catch(() => null) : null;
     if (saved) query = { ...structuredClone(DEFAULT_QUERY), ...saved };
-    await refreshConnections();
+    await Promise.all([refreshConnections(), loadSaved()]);
     if (!query.connectionId && connections.length === 1) query.connectionId = connections[0].id;
     ready = true;
     await applyContext(context);
@@ -379,6 +419,29 @@
     <div class="tabs" role="tablist">
       <button class="tab" class:active={query.mode === "builder"} role="tab" aria-selected={query.mode === "builder"} type="button" onclick={() => setMode("builder")}>{t("queryBuilder")}</button>
       <button class="tab" class:active={query.mode === "sql"} role="tab" aria-selected={query.mode === "sql"} type="button" onclick={() => setMode("sql")}>{t("sqlTab")}</button>
+      {#if ready && host.capabilities?.storage}
+        <div class="saved" role="group" aria-label={t("savedQueries")}>
+          <select
+            class="dbx-select"
+            aria-label={t("openSaved")}
+            value={savedQueries.some((saved) => saved.name === savedName.trim()) ? savedName.trim() : ""}
+            onfocus={loadSaved}
+            onchange={(e) => loadQuery(e.currentTarget.value)}
+          >
+            <option value="" disabled>{savedQueries.length ? t("openSaved") : t("noSaved")}</option>
+            {#each savedQueries as saved (saved.name)}<option value={saved.name}>{saved.name}</option>{/each}
+          </select>
+          <input class="dbx-input" aria-label={t("savedName")} placeholder={t("savedName")} bind:value={savedName} onkeydown={(e) => e.key === "Enter" && savedName.trim() && saveQuery()} />
+          <button class="dbx-btn" type="button" disabled={!savedName.trim()} onclick={saveQuery}>{t("save")}</button>
+          <button
+            class="dbx-btn dbx-btn--ghost"
+            type="button"
+            aria-label={t("deleteSaved")}
+            title={t("deleteSaved")}
+            disabled={!savedQueries.some((saved) => saved.name === savedName.trim())}
+            onclick={deleteQuery}>✕</button>
+        </div>
+      {/if}
       <span class="status" class:error role="status">
         {#if error}{error}{:else if loading}{t("running")}{:else if result}{t("rowsStatus", { rows: result.rows.length, ms: result.elapsedMs })}{result.truncated ? ` · ${t("truncated", { max: MAX_ROWS })}` : ""}{lastRun?.raw && result.rows.length >= MAX_ROWS ? ` · ${t("rawCapped", { max: MAX_ROWS })}` : ""}{refresh ? ` · ${zoomed ? t("refreshPaused") : t("refreshing", { interval: refresh })}` : ""}{/if}
       </span>
@@ -569,6 +632,19 @@
   .tab.active {
     color: var(--color-foreground);
     border-bottom-color: var(--color-primary);
+  }
+  .saved {
+    display: flex;
+    gap: 4px;
+    margin-left: 12px;
+  }
+  .saved .dbx-select,
+  .saved .dbx-input {
+    width: 150px;
+    height: 28px;
+  }
+  .saved .dbx-btn {
+    height: 28px;
   }
   .status {
     margin-left: auto;
