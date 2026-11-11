@@ -99,3 +99,14 @@ test("raw mode reads the latest rows, one series per child table", () => {
   // A normal table has no tbname series split.
   assert.match(buildQuery({ ...query, window: "raw", table: "nt1" }, meta), /^SELECT TO_ISO8601\(`ts`, 'Z'\) AS _time, `current`\n/);
 });
+
+test("tag labels add the tags next to tbname without changing the partition", () => {
+  const tagged = { ...query, tagLabels: true };
+  const superMeta = { ...meta, isSuper: true };
+  assert.match(buildQuery(tagged, superMeta), /^SELECT TO_ISO8601\(_wstart, 'Z'\) AS _time, tbname, `location`, `groupid`, AVG\(`current`\)/);
+  assert.match(buildQuery(tagged, superMeta), /\nPARTITION BY tbname\n/);
+  assert.match(buildQuery({ ...tagged, window: "raw" }, superMeta), /^SELECT TO_ISO8601\(`ts`, 'Z'\) AS _time, tbname, `location`, `groupid`, `current`\n/);
+  // Only a per-child-table result has tbname to rename.
+  assert.doesNotMatch(buildQuery({ ...tagged, groupBy: "location" }, superMeta), /`groupid`/);
+  assert.doesNotMatch(buildQuery(query, superMeta), /`location`, `groupid`/);
+});

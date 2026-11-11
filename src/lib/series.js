@@ -22,7 +22,8 @@ function toNumber(value) {
   return Number.isFinite(number) ? number : null; // "NaN" / "inf" strings become gaps
 }
 
-export function toSeries({ columns, rows }, { offset, labels = [] } = {}) {
+// hide: label columns that keep series apart but stay out of their names (tbname behind tag values).
+export function toSeries({ columns, rows }, { offset, labels = [], hide = [] } = {}) {
   const sample = (index) => rows.find((row) => row[index] != null)?.[index];
   const time = columns.findIndex((_, index) => TIME.test(String(sample(index) ?? "")));
   if (time < 0) return [];
@@ -33,18 +34,24 @@ export function toSeries({ columns, rows }, { offset, labels = [] } = {}) {
   const values = others.filter((column) => isValue(column, column.index));
   const keys = others.filter((column) => !isValue(column, column.index));
 
+  const label = (row, columns) => columns.map((key) => String(row[key.index] ?? "null")).join(" · ");
+  const nameOf = (text, value) => [text, text && values.length === 1 ? "" : value.name].filter(Boolean).join(" ");
+  const shown = keys.filter((key) => !hide.includes(key.name));
   const series = new Map();
   for (const row of rows) {
-    const label = keys.map((key) => String(row[key.index] ?? "null")).join(" · ");
     for (const value of values) {
-      const name = [label, label && values.length === 1 ? "" : value.name].filter(Boolean).join(" ");
-      if (!series.has(name)) series.set(name, []);
-      series.get(name).push([parseTime(row[time], offset), toNumber(row[value.index])]);
+      const id = nameOf(label(row, keys), value);
+      if (!series.has(id)) series.set(id, { name: nameOf(label(row, shown), value), data: [] });
+      series.get(id).data.push([parseTime(row[time], offset), toNumber(row[value.index])]);
     }
   }
+  // Series whose shown labels coincide keep the hidden ones too, so no two legend entries read the same.
+  const uses = new Map();
+  for (const { name } of series.values()) uses.set(name, (uses.get(name) ?? 0) + 1);
+  // Ordered by identity (tbname first), not by the shown name, so palette slots stay put when tag names are toggled.
   return [...series]
-    .map(([name, data]) => ({ name, data: data.sort((a, b) => a[0] - b[0]) }))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .map(([id, { name, data }]) => ({ name: uses.get(name) > 1 ? id : name, data: data.sort((a, b) => a[0] - b[0]) }));
 }
 
 export const lastValue = (series) => series?.data.findLast(([, value]) => value != null)?.[1] ?? null;

@@ -12,6 +12,7 @@ New to DBX plugins? [`docs/dbx-plugin-system.md`](docs/dbx-plugin-system.md) exp
 
 - **Cards like the InfluxDB builder:** Database → Table → Fields → any number of tag filter cards. Each filter card lists the values left after the cards on its left (`SELECT DISTINCT tag … WHERE <earlier filters>`), `tbname` included.
 - **Aggregate panel:** window (`auto` keeps every series under the row cap, ~360 points like InfluxDB), fill, one series per child table / per tag / merged, max series, and mean, median ≈, min, max, sum, count, first, last, spread, stddev.
+- **Series names from tags:** with one series per child table (or in raw mode), "Name series by tag values" shows the tag values (`BRU · 13`) instead of machine-made table names such as `node_id:BRU,company_id:13` or schemaless `t_<md5>`. Display only: series stay one per child table.
 - **Raw mode:** window "none (raw)" plots the latest 5000 points in the range, one series per child table, without aggregation.
 - **Views:** graph (line, step, points; crosshair tooltip with every series), single stat, table.
 - **Auto-refresh:** every 10s, 30s, 1m or 5m for relative ranges; it pauses while the chart is zoomed and turns off on any error.

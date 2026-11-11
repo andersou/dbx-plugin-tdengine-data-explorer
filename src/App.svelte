@@ -18,6 +18,7 @@
     durationMs,
     isFilterableType,
     isNumericType,
+    labelTags,
     parentTableQuery,
     tablesQuery,
     tagValuesQuery,
@@ -56,6 +57,7 @@
     sql: "",
     view: "graph",
     kind: "line",
+    tagLabels: false,
   };
   const EMPTY_META = { tsColumn: "", fields: [], tags: [], tagTypes: {}, isSuper: false };
   const MAX_STATES = 20;
@@ -109,7 +111,7 @@
     }
   });
   // SLIMIT keeps the first maxSeries partitions, so reaching it may hide the rest; the partition column follows _time.
-  const seriesCapped = $derived(!!result && !!lastRun?.labels.length && new Set(result.rows.map((row) => row[1])).size >= lastRun.maxSeries);
+  const seriesCapped = $derived(!!result && !!lastRun?.labels.length && !lastRun.raw && new Set(result.rows.map((row) => row[1])).size >= lastRun.maxSeries);
 
   // queryData rejects a 5th concurrent call; one at a time also spares the pool DBX tabs share.
   let queue = Promise.resolve();
@@ -217,17 +219,20 @@
     if (!sql) return void (error = submitError = t("writeSelect"));
     const raw = query.mode === "builder" && query.window === "raw";
     // Raw rows split by tbname, a text column toSeries labels on its own.
-    lastRun = { sql, raw, labels: query.mode === "builder" && !raw && query.groupBy ? [query.groupBy] : [], maxSeries: query.maxSeries, connectionId: query.connectionId };
+    // Tag values replace tbname in series names; tbname stays a label so tables that share tags keep apart.
+    const tags = query.mode === "builder" && query.tagLabels ? labelTags(query, meta) : [];
+    const labels = tags.length ? ["tbname", ...tags] : query.mode === "builder" && !raw && query.groupBy ? [query.groupBy] : [];
+    lastRun = { sql, raw, labels, hide: tags.length ? ["tbname"] : [], maxSeries: query.maxSeries, connectionId: query.connectionId };
     execute(lastRun);
   }
 
-  async function execute({ sql, labels, connectionId }, quiet = false) {
+  async function execute({ sql, labels, hide, connectionId }, quiet = false) {
     error = submitError = "";
     running = true;
     loading = !quiet;
     try {
       result = await run(sql, { connectionId });
-      series = toSeries(result, { offset, labels });
+      series = toSeries(result, { offset, labels, hide });
     } catch (e) {
       error = submitError = explain(e);
       refresh = ""; // a closed connection or a denied consent would fail on every tick
@@ -538,6 +543,9 @@
               {/each}
             </div>
           {/if}
+          {#if labelTags(query, meta).length}
+            <label class="tag-labels"><input type="checkbox" bind:checked={query.tagLabels} /> {t("tagLabels")}</label>
+          {/if}
         </section>
       </div>
     {:else}
@@ -721,6 +729,12 @@
     grid-template-columns: 76px 1fr;
     align-items: center;
     gap: 6px;
+  }
+  .aggregate > .tag-labels {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
   }
   .functions {
     min-height: 0;

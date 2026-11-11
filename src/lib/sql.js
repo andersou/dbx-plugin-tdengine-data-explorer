@@ -98,8 +98,12 @@ export function autoWindow(rangeMs, seriesCap = 1) {
   return WINDOWS.find((window) => rangeMs / durationMs(window) <= points) ?? WINDOWS.at(-1);
 }
 
+// Tags that can name the series of a per-child-table result; display only, the partition stays tbname.
+export const labelTags = (query, meta) => (meta.isSuper && (query.window === "raw" || query.groupBy === "tbname") ? Object.keys(meta.tagTypes) : []);
+
 export function buildQuery(query, meta) {
   const { database, table, fields, fns, filters, groupBy, fill, window, maxSeries } = query;
+  const tags = query.tagLabels ? labelTags(query, meta).map(quoteIdent) : [];
   if (!database || !table) fail("pickTable", "Choose a database and a table");
   if (!meta.tsColumn) fail("noTimestamp", `${table} has no timestamp column`, { table });
   if (!fields.length) fail("pickField", "Choose at least one field");
@@ -113,7 +117,7 @@ export function buildQuery(query, meta) {
   // Under ORDER BY, TDengine merges PARTITION BY output into one sorted stream, so no single query returns
   // the latest N rows of every series: raw mode takes the latest MAX_ROWS overall, one series per child table.
   if (window === "raw") {
-    const columns = [`TO_ISO8601(${ts}, 'Z') AS _time`, ...(meta.isSuper ? ["tbname"] : []), ...fields.map(quoteIdent)];
+    const columns = [`TO_ISO8601(${ts}, 'Z') AS _time`, ...(meta.isSuper ? ["tbname", ...tags] : []), ...fields.map(quoteIdent)];
     return [`SELECT ${columns.join(", ")}`, from, where, `ORDER BY ${ts} DESC`, `LIMIT ${MAX_ROWS}`].join("\n");
   }
 
@@ -126,7 +130,7 @@ export function buildQuery(query, meta) {
 
   return [
     // The agent renders TIMESTAMP without an offset; an explicit UTC string keeps the chart exact.
-    `SELECT TO_ISO8601(_wstart, 'Z') AS _time, ${partition ? `${partition}, ` : ""}${values.join(", ")}`,
+    `SELECT TO_ISO8601(_wstart, 'Z') AS _time, ${[partition, ...tags, ...values].filter(Boolean).join(", ")}`,
     from,
     where,
     partition && `PARTITION BY ${partition}`,

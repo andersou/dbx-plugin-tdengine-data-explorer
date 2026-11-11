@@ -55,6 +55,7 @@ Run `npm test` and `npm run build` before every commit. Run the TDengine suite w
 - **Auto-refresh** repeats the last submitted query (`lastRun`), skips ticks while running or zoomed, and turns itself off on any error.
 - **Raw mode** (`window: "raw"`) is `ORDER BY ts DESC LIMIT MAX_ROWS` without `PARTITION BY`: under `ORDER BY`, TDengine sorts partitions as one stream, so per-series limits are not available in one query.
 - **Strings:** every UI string goes through `t()` with keys in all three tables of `src/lib/i18n.js` (`test/i18n.test.js` enforces matching keys and placeholders). Validation errors from `sql.js` carry a `code` that is also a message key.
+- **Tag labels** (`tagLabels`) are display only: `labelTags` adds the tag columns next to `tbname` while the partition stays `tbname`, and `toSeries` keeps `tbname` as a hidden label so tables that share tag values never merge (it reappears in a name only on a clash). Series are ordered by that identity, tbname first, so colors do not move when the names change.
 - **Saved queries** live in one global `host.storage` key (`saved`, newest first, `MAX_SAVED` 50) without `connectionId`; re-read before writing, and write nothing when that read fails.
 
 ## Testing in a real DBX

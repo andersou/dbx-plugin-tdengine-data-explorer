@@ -44,6 +44,11 @@ test("generated SQL runs on TDengine", { skip: !url && "set TDENGINE_URL" }, asy
   const [[current]] = (await run("SELECT `current` FROM power.meters WHERE `current` IS NOT NULL LIMIT 1")).rows;
   assert.ok((await run(`SELECT COUNT(*) FROM power.meters WHERE ${filterClause({ key: "current", values: [current] }, "FLOAT")}`)).rows[0][0] > 0);
 
+  // Tags selected next to tbname under PARTITION BY tbname: one series per child table, named by tags.
+  const tagged = await run(buildQuery({ ...base, tagLabels: true }, { tsColumn: "ts", tagTypes, isSuper: true }));
+  const tables = new Set(tagged.rows.map((row) => row[1]));
+  assert.equal(toSeries(tagged, { labels: ["tbname", ...Object.keys(tagTypes)], hide: ["tbname"] }).length, tables.size * base.fields.length);
+
   const raw = await run(buildQuery({ ...base, window: "raw", fns: [] }, { tsColumn: "ts", tagTypes, isSuper: true }));
   const times = raw.rows.map(([time]) => Date.parse(time));
   assert.ok(raw.rows.length > 0 && times.every((time, index) => index === 0 || time <= times[index - 1]), "raw rows come newest first");

@@ -39,3 +39,19 @@ test("custom SQL without dataType: strings are labels, numbers are values", () =
 test("results without a time column have no series", () => {
   assert.deepEqual(toSeries({ columns: [{ name: "name" }], rows: [["power"]] }), []);
 });
+
+test("hidden labels keep series apart but stay out of the names unless names clash", () => {
+  const columns = [{ name: "_time", dataType: "VARCHAR" }, { name: "tbname", dataType: "VARCHAR" }, { name: "node", dataType: "VARCHAR" }, { name: "company", dataType: "INT" }, { name: "cpu", dataType: "DOUBLE" }];
+  const t = "2026-11-10T00:00:00.000Z";
+  const rows = [
+    [t, "node_id:BRU,company_id:13", "BRU", 13, 1],
+    [t, "node_id:GRU,company_id:13", "GRU", 13, 2],
+    [t, "dup-a", "REC", 21, 3],
+    [t, "dup-b", "REC", 21, 4],
+  ];
+  const names = toSeries({ columns, rows }, { labels: ["tbname", "node", "company"], hide: ["tbname"] }).map((s) => s.name);
+  // Same order as the tbnames alone, so each series keeps its color when tag names are toggled.
+  assert.deepEqual(names, ["dup-a · REC · 21", "dup-b · REC · 21", "BRU · 13", "GRU · 13"]);
+  const plain = rows.map(([time, tbname, , , cpu]) => [time, tbname, cpu]);
+  assert.deepEqual(toSeries({ columns: [columns[0], columns[1], columns[4]], rows: plain }, { labels: ["tbname"] }).map((s) => s.name), ["dup-a", "dup-b", "node_id:BRU,company_id:13", "node_id:GRU,company_id:13"]);
+});
