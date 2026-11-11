@@ -2,7 +2,7 @@
 // TDENGINE_URL=http://localhost:6041 npm test  (seed first: taosBenchmark -y -d power)
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FILLS, FUNCTIONS, buildQuery, databasesQuery, describeQuery, tablesQuery, tagValuesQuery } from "../src/lib/sql.js";
+import { FILLS, FUNCTIONS, buildQuery, databasesQuery, describeQuery, filterClause, tablesQuery, tagValuesQuery } from "../src/lib/sql.js";
 import { toSeries } from "../src/lib/series.js";
 
 const url = process.env.TDENGINE_URL;
@@ -40,6 +40,9 @@ test("generated SQL runs on TDengine", { skip: !url && "set TDENGINE_URL" }, asy
   for (const fill of Object.keys(FILLS)) await run(buildQuery({ ...base, fill }, { tsColumn: "ts", tagTypes }));
   for (const groupBy of ["", "location", "groupid"]) await run(buildQuery({ ...base, groupBy }, { tsColumn: "ts", tagTypes }));
   await run(buildQuery({ ...base, range: { type: "relative", value: "7d" } }, { tsColumn: "ts", tagTypes }));
+  // FLOAT values arrive as their shortest decimal, which an IN list (compared as DOUBLE) never matches.
+  const [[current]] = (await run("SELECT `current` FROM power.meters WHERE `current` IS NOT NULL LIMIT 1")).rows;
+  assert.ok((await run(`SELECT COUNT(*) FROM power.meters WHERE ${filterClause({ key: "current", values: [current] }, "FLOAT")}`)).rows[0][0] > 0);
 
   const raw = await run(buildQuery({ ...base, window: "raw", fns: [] }, { tsColumn: "ts", tagTypes, isSuper: true }));
   const times = raw.rows.map(([time]) => Date.parse(time));

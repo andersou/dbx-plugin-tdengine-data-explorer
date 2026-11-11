@@ -70,10 +70,12 @@ const column = (key) => (key === "tbname" ? "tbname" : quoteIdent(key));
 
 // One filter card: selected values of one tag, NULL included as IS NULL.
 export function filterClause({ key, values }, type = "VARCHAR") {
-  const present = values.filter((value) => value !== null);
+  const literals = values.filter((value) => value !== null).map((value) => literal(value, type));
   const parts = [];
-  if (present.length) parts.push(`${column(key)} IN (${present.map((value) => literal(value, type)).join(", ")})`);
-  if (present.length < values.length) parts.push(`${column(key)} IS NULL`);
+  // TDengine compares an IN list as DOUBLE, where a FLOAT 1.1 (1.10000002) never matches 1.1; = compares as FLOAT.
+  if (/^FLOAT\b/i.test(type)) parts.push(...literals.map((value) => `${column(key)} = ${value}`));
+  else if (literals.length) parts.push(`${column(key)} IN (${literals.join(", ")})`);
+  if (literals.length < values.length) parts.push(`${column(key)} IS NULL`);
   return parts.length > 1 ? `(${parts.join(" OR ")})` : parts[0];
 }
 

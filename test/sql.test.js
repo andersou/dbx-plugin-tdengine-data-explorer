@@ -66,6 +66,9 @@ test("literals and identifiers are escaped", () => {
   assert.equal(filterClause({ key: "groupid", values: [1, null] }, "INT"), "(`groupid` IN (1) OR `groupid` IS NULL)");
   assert.equal(filterClause({ key: "on", values: [true] }, "BOOL"), "`on` IN (true)");
   assert.throws(() => filterClause({ key: "groupid", values: ["1; DROP"] }, "INT"));
+  // An IN list compares a FLOAT tag as DOUBLE and matches nothing.
+  assert.equal(filterClause({ key: "gain", values: [1.1, 2.5, null] }, "FLOAT"), "(`gain` = 1.1 OR `gain` = 2.5 OR `gain` IS NULL)");
+  assert.equal(filterClause({ key: "gain", values: [1.1] }, "FLOAT"), "`gain` = 1.1");
 });
 
 test("tag values cascade from earlier filters", () => {
