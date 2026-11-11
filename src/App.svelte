@@ -88,6 +88,7 @@
   const connections = $derived(allConnections.filter((connection) => connection.dbType === "tdengine"));
   const current = $derived(allConnections.find((connection) => connection.id === query.connectionId));
   const unsupported = $derived(current && current.dbType !== "tdengine");
+  const listed = $derived(!!current); // a boolean, so refreshing the connection list does not re-run the loads
   const t = (key, vars) => translate(locale, key, vars);
   const numberFormat = $derived(new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }));
   const tagKeys = $derived(meta.isSuper ? ["tbname", ...meta.tags.map((tag) => tag.name)] : []);
@@ -129,7 +130,9 @@
     return () => (stale = true);
   }
 
-  const canQuery = () => ready && query.connectionId && !unsupported;
+  // The one gate for every query. With the connections API, an unlisted connection (deleted, or the list failed)
+  // is refused like a non-TDengine one; hosts without that API cannot tell the type.
+  const canQuery = () => ready && query.connectionId && !unsupported && (listed || !host.capabilities?.connectionsApi);
 
   $effect(() => {
     void reloadTick;
@@ -198,6 +201,7 @@
   }
 
   function submit() {
+    if (running || !canQuery()) return; // Ctrl+Enter bypasses the disabled button
     let sql;
     try {
       sql = query.mode === "sql" ? query.sql.trim() : buildQuery(query, meta);
@@ -248,7 +252,7 @@
     if (!context?.connectionId) return;
     query.connectionId = context.connectionId;
     // The table menu shows on every connection type; never ask consent for a non-TDengine one.
-    if (!context.database || !context.table || unsupported) return;
+    if (!context.database || !context.table || !canQuery()) return;
     query.database = context.database;
     // A child table opens as its supertable filtered to that child, like one InfluxDB series.
     const parent = await run(parentTableQuery(context.database, context.table)).then(
@@ -383,7 +387,7 @@
       <option value="">{t("refreshOff")}</option>
       {#each REFRESH_INTERVALS as interval (interval)}<option value={interval}>{t("refreshEvery", { interval })}</option>{/each}
     </select>
-    <button class="dbx-btn dbx-btn--primary" type="button" disabled={running || !query.connectionId || unsupported} onclick={submit}>{t("submit")}</button>
+    <button class="dbx-btn dbx-btn--primary" type="button" disabled={running || !canQuery()} onclick={submit}>{t("submit")}</button>
   </header>
 
   <section class="result">
