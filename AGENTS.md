@@ -48,7 +48,11 @@ Run `npm test` and `npm run build` before every commit. Run the TDengine suite w
 - **UI:** use the DBX UI kit classes (`dbx-card`, `dbx-btn`, `dbx-select`, …) and `--color-*` tokens so light/dark and custom palettes follow DBX. Chart colors come from the validated 8-slot palette in `Chart.svelte`; series 9+ are gray. Do not add hues.
 - **Untrusted text:** database values reach the DOM only through Svelte interpolation; never `{@html}`.
 - **Context menu:** the table menu entry shows on every database type (DBX cannot scope it without a sidecar). The workbench must keep refusing non-TDengine connections without querying them, so no consent prompt appears for them.
-- **Restoring a tab never runs a query:** state restore and context changes only load metadata; the user presses Submit.
+- **Restoring a tab never runs a query:** state restore, context changes and opening a saved query only load metadata; the user presses Submit. The auto-refresh interval stays out of `query` so it is never saved.
+- **Auto-refresh** repeats the last submitted query (`lastRun`), skips ticks while running or zoomed, and turns itself off on any error.
+- **Raw mode** (`window: "raw"`) is `ORDER BY ts DESC LIMIT MAX_ROWS` without `PARTITION BY`: under `ORDER BY`, TDengine sorts partitions as one stream, so per-series limits are not available in one query.
+- **Strings:** every UI string goes through `t()` with keys in all three tables of `src/lib/i18n.js` (`test/i18n.test.js` enforces matching keys and placeholders). Validation errors from `sql.js` carry a `code` that is also a message key.
+- **Saved queries** live in one global `host.storage` key (`saved`, newest first, `MAX_SAVED` 50) without `connectionId`; re-read before writing.
 
 ## Testing in a real DBX
 
@@ -69,6 +73,8 @@ Screenshots in `docs/screenshots/` were captured this way at 1920×1080; refresh
 - Versions come from Conventional Commits on `main`: `feat` → minor; `fix`, `perf`, `revert` → patch; breaking change → major; `docs`, `chore`, `ci`, `test`, `refactor`, `style`, `build` → no release. `develop` publishes `-beta` prereleases.
 - A release `vX.Y.Z` carries the `.dbxp`, its `.artifact.json` and `SHA256SUMS`. DBX Store submission is still manual: a candidate PR to `t8y2/dbx-store` with the release asset URL and the `.artifact.json` values.
 
-## Not built yet
+## Decided against
 
-Auto-refresh, saved queries, a `result-view` for the SQL editor, raw (non-aggregated) builder mode, plugin UI translations. Keep new features in the same shape: pure logic in `src/lib` with `node:test` coverage, UI in Svelte components.
+A `result-view` contribution for DBX's SQL editor: DBX already charts those results natively, the button would show on every database type (no dbType filter), and the snapshot is 500 rows without column types and with offset-less timestamps. Revisit only if DBX adds a dbType filter and column types.
+
+Keep new features in the same shape: pure logic in `src/lib` with `node:test` coverage, UI in Svelte components, strings in `src/lib/i18n.js`.

@@ -12,8 +12,12 @@ New to DBX plugins? [`docs/dbx-plugin-system.md`](docs/dbx-plugin-system.md) exp
 
 - **Cards like the InfluxDB builder:** Database → Table → Fields → any number of tag filter cards. Each filter card lists the values left after the cards on its left (`SELECT DISTINCT tag … WHERE <earlier filters>`), `tbname` included.
 - **Aggregate panel:** window (`auto` keeps every series under the row cap, ~360 points like InfluxDB), fill, one series per child table / per tag / merged, max series, and mean, median ≈, min, max, sum, count, first, last, spread, stddev.
+- **Raw mode:** window "none (raw)" plots the latest 5000 points in the range, one series per child table, without aggregation.
 - **Views:** graph (line, step, points; crosshair tooltip with every series), single stat, table.
+- **Auto-refresh:** every 10s, 30s, 1m or 5m for relative ranges; it pauses while the chart is zoomed and turns off on any error.
 - **SQL tab:** shows the generated SQL; edit it or write your own read-only query (Ctrl+Enter).
+- **Saved queries:** name a builder or SQL query and reopen it from any tab; it applies to the open connection and waits for Submit.
+- **Languages:** English, Simplified Chinese and Brazilian Portuguese, following the DBX language.
 - **Entry points:** the app toolbar / command palette, and **Open in TDengine Data Explorer** on a table's context menu. A child table opens as its supertable filtered to that `tbname`.
 
 ## How it works
@@ -63,7 +67,10 @@ The integration test expects `taosBenchmark -y -d power` data. `dbx-plugin dev` 
 - `queryData` returns at most 5000 rows; a truncated result says so in the status line. Shorten the range, widen the window or lower max series.
 - DBX cannot scope context-menu entries to one database type, so the table menu entry also shows on other connections; the builder refuses non-TDengine connections without querying them.
 - Timestamps in hand-written SQL are read in the server time zone with one fixed offset (`SELECT timezone()`); builder queries are exact because they use `TO_ISO8601(…, 'Z')`.
-- Not included: auto-refresh, saved queries, a `result-view` for the SQL editor, raw (non-aggregated) builder mode, plugin UI translations.
+- Auto-refresh keeps running while its DBX tab is in the background: Host API 1.4 gives plugins no tab-visibility signal.
+- Raw mode cannot return the latest N points of every series in one query (TDengine sorts `PARTITION BY` output as one stream under `ORDER BY`), so busy child tables can fill most of the 5000 points; the status line says when the cap hides older points.
+- Host and TDengine error messages stay in English.
+- Dropped: a `result-view` button for DBX's SQL editor. DBX already charts SQL-editor results natively, the button would appear on every database type, and its snapshot is capped at 500 rows without column types; the SQL tab covers the same need with up to 5000 rows.
 
 ## Releases
 
